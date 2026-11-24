@@ -8,6 +8,7 @@ export type ViewMode = "3d" | "2d";
 export const PAGES = [
   { id: "explorer", label: "Explorer" },
   { id: "training", label: "Training Studio" },
+  { id: "playground", label: "AI Playground" },
   { id: "pipeline", label: "Pipeline" },
   { id: "registry", label: "Experiments" },
 ] as const;

@@ -11,6 +11,7 @@ import { useMoon } from "./store";
 const TrainingStudio = lazy(() => import("./pages/TrainingStudio"));
 const PipelinePage = lazy(() => import("./pages/PipelinePage"));
 const ExperimentsPage = lazy(() => import("./pages/ExperimentsPage"));
+const Playground = lazy(() => import("./pages/Playground"));
 
 export default function App() {
   const page = useMoon((s) => s.page);
@@ -33,6 +34,7 @@ export default function App() {
           {page === "training" && <TrainingStudio />}
           {page === "pipeline" && <PipelinePage />}
           {page === "registry" && <ExperimentsPage />}
+          {page === "playground" && <Playground />}
         </Suspense>
       )}
     </div>

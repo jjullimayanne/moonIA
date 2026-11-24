@@ -21,6 +21,7 @@ export default defineConfig({
       })),
     }),
   ],
+  worker: { format: "es" },
   define: { CESIUM_BASE_URL: JSON.stringify(`${base}cesium`) },
   build: { chunkSizeWarningLimit: 6000 },
   test: { environment: "node", include: ["src/**/*.test.ts"] },
