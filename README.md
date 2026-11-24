@@ -1,12 +1,75 @@
 # MoonAI — Lunar Intelligence Platform
 
-**An interactive, scientifically grounded lunar exploration platform: a "Google Earth for the Moon" built on real NASA/USGS data, with a deep-learning crater detector on the way.**
+### 🌕 Live demo: **[jjullimayanne.github.io/moonIA](https://jjullimayanne.github.io/moonIA/)**
+
+**An interactive, scientifically grounded lunar exploration platform: a "Google Earth for the Moon" built on real NASA/USGS data, with a deep-learning crater detector trained locally and running in your browser.**
 
 Developed for the **Space Tech Bootcamp 2026 (FTL Brazil)**.
 
 ![MoonAI — Tycho crater with LOLA + Kaguya color hillshade, Head 2010 crater rims and live DEM readout](docs/assets/moonai-tycho.jpg)
 
-> **Status.** Lunar map, real data layers, catalogs, terrain readout, local training pipeline and the first trained model (**v1**, a reduced DeepMoon reproduction; see Results) are operational. All metrics shown come from real runs. Smoke runs are labelled as such, and nothing is simulated.
+> **Status.** Lunar map, real data layers, catalogs, terrain readout, local training pipeline and the first trained model (**v1**, a reduced DeepMoon reproduction; see [Results](#results-model-v1-development-profile-trained-locally-on-apple-silicon)) are operational. All metrics shown come from real runs. Smoke runs are labelled as such, and nothing is simulated.
+
+## What was built, in one minute
+
+1. **A real lunar map.** CesiumJS draws the Moon on the IAU lunar sphere (R = 1737.4 km), *not* on Earth's WGS84 ellipsoid. It streams real NASA imagery, elevation and slope tiles, and overlays 24 520 catalogued craters and 9 087 official IAU names.
+2. **Real terrain measurements.** Clicking a point reads elevation and slope from the 22.6 GB LOLA + Kaguya DEM with HTTP range requests (about 1 MB per point, never the whole file).
+3. **A local deep-learning pipeline.** One command (`make pipeline`) downloads the DeepMoon dataset (only the tiles needed), checks it, trains a U-Net **on the Mac's GPU (MPS)**, evaluates it against the scientific catalogs, exports it to ONNX, runs a quality gate and publishes versioned artifacts.
+4. **The first model (v1).** It was trained in about 14 minutes and found 2 214 craters in the held-out longitude bands. 70 % of its detections match a catalogued crater, and 657 are uncatalogued *candidates*.
+5. **A lab you can explore.** The **Training Studio** replays the learning epoch by epoch, the **AI Playground** runs the model *in your browser* (ONNX Runtime Web in a Web Worker), and the **Experiments** page lists every run with its gate decision.
+6. **Low-cost cloud design.** The site runs free on GitHub Pages. An AWS stack (S3 + CloudFront + Lambda) is ready in Terraform, designed for < US$ 5/month, and **not applied** until authorized.
+
+## How it works
+
+```mermaid
+flowchart LR
+    subgraph Sources["Real data sources"]
+        TREK["NASA Moon Trek<br/>WMTS tiles<br/>(imagery, elevation, slope)"]
+        USGS["USGS Astrogeology<br/>LOLA + Kaguya DEM 22.6 GB<br/>IAU nomenclature"]
+        ZEN["Zenodo DeepMoon<br/>DEM tiles + crater rings<br/>(CC-BY-SA-4.0)"]
+        CAT["Crater catalogs<br/>Head 2010 · Povilaitis 2018"]
+    end
+
+    subgraph Local["Your computer (all ML happens here)"]
+        PIPE["make pipeline<br/>download → preprocess → train (MPS/CUDA/CPU)<br/>→ evaluate → ONNX → quality gate"]
+        MLF[("MLflow<br/>local SQLite")]
+        PIPE --- MLF
+    end
+
+    subgraph Site["Static site (GitHub Pages today · S3 + CloudFront ready)"]
+        APP["React + CesiumJS app"]
+        ART[("moonai/<br/>latest.json · models/vN/model.onnx<br/>predictions · experiments")]
+    end
+
+    API["FastAPI (optional)<br/>local · or AWS Lambda"]
+
+    ZEN -- "HTTP range requests<br/>(only N tiles, MD5-checked)" --> PIPE
+    CAT --> PIPE
+    PIPE -- "approved artifacts only" --> ART
+    ART --> APP
+    TREK -- "tiles streamed by the browser" --> APP
+    CAT -- "normalized JSON" --> APP
+    USGS -- "3×3 window reads" --> API
+    API -- "elevation · slope" --> APP
+    APP -- "ONNX Runtime Web<br/>in a Web Worker" --> APP
+```
+
+```mermaid
+flowchart TD
+    A["1 · Download<br/>Zenodo record 1133969<br/>pinned MD5s · resumable"] --> B["2 · Extract subset<br/>first N tiles via byte ranges<br/>+ lon/lat bounds per tile"]
+    B --> C{"3 · Leakage check<br/>train / val / test<br/>longitude bands disjoint?"}
+    C -- no --> X["stop"]
+    C -- yes --> D["4 · Normalize<br/>x / 255 → [0,1]<br/>rings → binary mask"]
+    D --> E["5 · Train U-Net<br/>Adam + BCE · augment rot90/flip<br/>checkpoints · early stopping"]
+    E --> F["6 · Evaluate on validation<br/>template matching → craters<br/>match vs catalog: P / R / F1 / errors"]
+    F --> G["7 · Export ONNX<br/>equivalence vs PyTorch"]
+    G --> H{"8 · Quality gate<br/>F1 ≥ min · beats published<br/>size · ONNX ≡ PyTorch"}
+    H -- rejected --> I["publish experiment only<br/>(previous model stays active)"]
+    H -- approved --> J["9 · Test set, evaluated once"]
+    J --> K["10 · Pixels → lunar lon/lat/km<br/>global de-duplication<br/>GeoJSON (IAU Moon CRS)"]
+    K --> L["11 · Publish models/vN<br/>then switch latest.json"]
+    L --> M["Explorer · Training Studio<br/>AI Playground update<br/>without redeploying the frontend"]
+```
 
 ---
 
@@ -102,11 +165,21 @@ Measured on the downloaded tiles, not copied from the paper:
 
 Only the tiles a profile needs are downloaded. The image arrays are stored contiguously in the HDF5 files, so the first *N* tiles are fetched with HTTP range requests (≈0.33 MB per tile instead of 9.9 GB per file), with every file MD5-checked against Zenodo.
 
-### Normalization and augmentation
+### Data normalization and transformations (raw → model → map)
 
-* **Input:** `x / 255 → [0, 1]`, the exact convention of the published data. Padding stays at 0. The same rule is stored in the model metadata (`normalization: divide_by 255`) so browser inference reproduces it.
-* **Target:** binarized (`> 0.5`) and stored as `uint8`.
-* **Augmentation (training only):** random 90° rotations and horizontal flips. These are the only transforms that keep circular rims circular and avoid interpolating elevation values. No shear, scaling or color jitter.
+Every transformation applied to the data, in order. Nothing else is done to the data.
+
+| # | Where | Raw data | Transformation | Why |
+|---|---|---|---|---|
+| 1 | Catalog ingestion | DeepMoon CSVs use classic-Mac `\r` line endings. IAU longitudes are 0–360° E. | Parse `\r`. **Normalize longitudes to [−180°, 180°)**. Validate ranges and declared coverage (Head: global, Povilaitis: ±60°). | One lunar convention everywhere: planetocentric latitude, east-positive longitude. |
+| 2 | Terrain API | DEM `int16`, nodata −32768, `scale = 0.5`. | `elevation_m = DN × 0.5` relative to the 1737.4 km sphere. Nodata is rejected. Slope uses Horn 3×3 with `dx = 59.2 m · cos φ`. | Returns real metres and degrees, and corrects for east–west pixel shrinking with latitude. |
+| 3 | Tile extraction | `input_images` `uint8` (0–177 observed, mean 100.3, σ 42.4; 14 % padding zeros). `target_masks` `float32` {0, 1}. | Images copied byte-exact. Masks **binarized (> 0.5) and stored as `uint8`**, which is lossless and 4× smaller. Lon/lat bounds, distortion and center are kept per tile. | Keeps every pixel tied to lunar coordinates. |
+| 4 | Model input | `uint8` 0–255 | **`x / 255 → float32 ∈ [0, 1]`**. No mean/std standardization, no per-tile stretch. Padding stays 0. | The exact convention of the published DeepMoon data. Recorded in `latest.json → normalization` so the browser applies the identical rule. |
+| 5 | Augmentation (train only) | — | Random **90° rotation** (k ∈ {0,1,2,3}) and **horizontal flip** (p = 0.5), applied identically to image and mask. | The only transforms that keep circles circular and avoid interpolating elevation. No shear, scaling, blur or contrast changes. |
+| 6 | Loss | Rims are only **1.45 %** of pixels | `BCEWithLogitsLoss`, unweighted, as in DeepMoon. | Kept for comparability. A class-balanced loss is the next experiment. |
+| 7 | Model output | logits | `sigmoid → probability that a pixel is a rim`. Binarized at **0.1** (DeepMoon `target_thresh`) before template matching and IoU. | |
+| 8 | Pixels → craters | binary rim map | Ring template matching r = 5–40 px, correlation > 0.5, duplicate merge Δpos²/r² < 1.8 and Δr/r < 1. | DeepMoon post-processing, unchanged. |
+| 9 | Pixels → Moon | (x, y, r) px | DeepMoon's inverse orthographic transform → **lon°, lat°, diameter km** on R = 1737.4 km (checked against the catalog: median error 0.01°). Overlapping tiles are **globally de-duplicated**: 3 336 → 2 214. | Map-ready GeoJSON, declared in the lunar CRS (never WGS84). |
 
 ### Network architecture: U-Net (after DeepMoon, Silburt et al. 2019)
 
