@@ -2,7 +2,7 @@
   "id": "production-20261124-183448-560f4e7",
   "profile": "production",
   "created_at": "2026-11-24T18:34:48Z",
-  "git_commit": "e56d5ab",
+  "git_commit": "7755c9d",
   "seed": 42,
   "config": {
     "profile": "production",
@@ -58,7 +58,7 @@
     "platform": "Linux x86_64",
     "cpu_count": 2,
     "ram_total_gb": 12.7,
-    "ram_available_gb": 4.7,
+    "ram_available_gb": 10.9,
     "disk_free_gb": 105.2,
     "torch_version": "2.14.1+cu130"
   },
