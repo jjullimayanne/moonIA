@@ -1,0 +1,169 @@
+{
+  "id": "production-20261124-183448-560f4e7",
+  "profile": "production",
+  "created_at": "2026-11-24T18:34:48Z",
+  "git_commit": "560f4e7",
+  "seed": 42,
+  "config": {
+    "profile": "production",
+    "seed": 42,
+    "data": {
+      "n_train": 30000,
+      "n_val": 5000,
+      "n_test": 5000,
+      "fixed_val_samples": 8
+    },
+    "model": {
+      "filters": 112,
+      "dropout": 0.15
+    },
+    "train": {
+      "epochs": 4,
+      "batch_size": "auto",
+      "lr": 0.0001,
+      "weight_decay": 1e-06,
+      "early_stopping_patience": 3,
+      "pos_weight": 1.0,
+      "activation_epochs": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "eval_tiles_per_epoch": 64,
+      "progress_every_steps": 20
+    },
+    "evaluation": {
+      "template_thresh": 0.5,
+      "target_thresh": 0.1,
+      "min_radius_px": 5,
+      "max_radius_px": 40,
+      "longlat_thresh2": 1.8,
+      "rad_thresh": 1.0
+    },
+    "gate": {
+      "min_val_f1": 0.5,
+      "allow_publish": true,
+      "max_onnx_mb": 60.0,
+      "onnx_atol": 0.001
+    },
+    "publish": {
+      "keep_versions": 5,
+      "max_upload_mb": 150.0
+    }
+  },
+  "hardware": {
+    "device": "cuda",
+    "device_name": "Tesla T4",
+    "platform": "Linux x86_64",
+    "cpu_count": 2,
+    "ram_total_gb": 12.7,
+    "ram_available_gb": 10.6,
+    "disk_free_gb": 106.7,
+    "torch_version": "2.14.1+cu130"
+  },
+  "architecture": {
+    "name": "U-Net (DeepMoon)",
+    "params": 10278017,
+    "levels": 3,
+    "filters": [
+      112,
+      224,
+      448,
+      448
+    ],
+    "input": [
+      1,
+      1,
+      256,
+      256
+    ],
+    "output": "logits [1,1,256,256]; sigmoid \u2192 rim probability",
+    "reference": "Silburt et al. 2019, Icarus 317:27-38"
+  },
+  "dataset": {
+    "source": "https://zenodo.org/api/records/1133969",
+    "doi": "10.5281/zenodo.1133969",
+    "license": "CC-BY-SA-4.0",
+    "citation": "Silburt et al. (2019), Lunar crater identification via deep learning, Icarus 317, 27-38",
+    "dataset_version": "deepmoon-zenodo-1133969",
+    "splits": {
+      "train": {
+        "complete": true,
+        "split": "train",
+        "n": 30000,
+        "source_file": "train_images.hdf5",
+        "source_md5": "83c1f8b4c7c0c9a9a9c7674ff489ef0a",
+        "source_url": "https://zenodo.org/api/records/1133969/files/train_images.hdf5/content",
+        "extracted_at": "2026-11-24T19:23:07Z",
+        "sha256": "cd7a6bff41022e99c6410e14bce4327e5358fb29219fd55d22dc818b87ef6958",
+        "lon_range": [
+          -179.99609375,
+          -60.00390625
+        ],
+        "lat_range": [
+          -59.984375,
+          59.9921875
+        ],
+        "crs": "Moon sphere R=1737.4 km; tiles are orthographic crops of the 118 m/px LOLA-Kaguya DEM",
+        "normalization": "uint8 elevation; model input = x / 255"
+      },
+      "val": {
+        "complete": true,
+        "split": "val",
+        "n": 5000,
+        "source_file": "dev_images.hdf5",
+        "source_md5": "dbd05ba31eac639c3e6f4efaaa946ae9",
+        "source_url": "https://zenodo.org/api/records/1133969/files/dev_images.hdf5/content",
+        "extracted_at": "2026-11-24T19:46:16Z",
+        "sha256": "e3f61dc8ad9e2d06f80955f9e744b2eb91985823359d2480d2168e0a057d7dde",
+        "lon_range": [
+          -59.9921875,
+          59.9296875
+        ],
+        "lat_range": [
+          -59.9765625,
+          59.9921875
+        ],
+        "crs": "Moon sphere R=1737.4 km; tiles are orthographic crops of the 118 m/px LOLA-Kaguya DEM",
+        "normalization": "uint8 elevation; model input = x / 255"
+      },
+      "test": {
+        "complete": true,
+        "split": "test",
+        "n": 5000,
+        "source_file": "test_images.hdf5",
+        "source_md5": "9045f7f91a0a10175a6e384a8bbabf63",
+        "source_url": "https://zenodo.org/api/records/1133969/files/test_images.hdf5/content",
+        "extracted_at": "2026-11-24T19:55:18Z",
+        "sha256": "9c9ed370c0be57ce11038e565ec34a063dab85bd0b4794789adc42b8a43bc792",
+        "lon_range": [
+          60.03125,
+          179.98046875
+        ],
+        "lat_range": [
+          -59.9765625,
+          59.984375
+        ],
+        "crs": "Moon sphere R=1737.4 km; tiles are orthographic crops of the 118 m/px LOLA-Kaguya DEM",
+        "normalization": "uint8 elevation; model input = x / 255"
+      }
+    },
+    "longitude_bands": {
+      "train": [
+        -179.99609375,
+        -60.00390625
+      ],
+      "val": [
+        -59.9921875,
+        59.9296875
+      ],
+      "test": [
+        60.03125,
+        179.98046875
+      ]
+    },
+    "leakage_check": "passed: train/val/test longitude bands are disjoint"
+  },
+  "status": "running"
+}
