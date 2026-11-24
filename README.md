@@ -90,7 +90,7 @@ flowchart TD
 | Crater names | IAU Gazetteer of Planetary Nomenclature (USGS) | Static JSON |
 | Violet dashed rims and dots (AI detections) | Output of the trained model | Static GeoJSON in `frontend/public/moonai/predictions/` |
 | Training Studio, Experiments, AI Discoveries | Pipeline artifacts (history, metrics, sample predictions) | Static JSON and PNG in `frontend/public/moonai/` |
-| Elevation and slope of a clicked point | USGS LOLA + Kaguya DEM (22.6 GB), read by range requests | **FastAPI backend**: local only today, so this panel is hidden on the public site |
+| Elevation and slope of a clicked point | USGS LOLA + Kaguya DEM (22.6 GB), read by range requests | **FastAPI backend**: local only today, so the public site runs in "static mode" with these queries disabled |
 
 The public site needs **no API and no server**. It is a static build on GitHub Pages, so it costs nothing.
 
