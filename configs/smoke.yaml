@@ -1,0 +1,29 @@
+# Smoke: verifies the whole pipeline end-to-end in minutes. NOT a scientific result.
+profile: smoke
+seed: 42
+data:
+  n_train: 64          # tiles streamed from train_images.hdf5 (range requests)
+  n_val: 32
+  n_test: 0            # test set untouched in smoke runs
+  fixed_val_samples: 4 # tiles tracked visually every epoch (Training Studio)
+model:
+  filters: 16          # DeepMoon uses 112
+  dropout: 0.15
+train:
+  epochs: 3
+  batch_size: auto
+  lr: 1.0e-4
+  weight_decay: 1.0e-6
+  early_stopping_patience: 5
+  activation_epochs: [1, 3]
+evaluation:
+  template_thresh: 0.5
+  target_thresh: 0.1
+  min_radius_px: 5
+  max_radius_px: 40
+gate:
+  min_val_f1: 0.0      # smoke runs are never published as models
+  allow_publish: false
+publish:
+  keep_versions: 5
+  max_upload_mb: 50

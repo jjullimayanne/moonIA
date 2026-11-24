@@ -32,3 +32,7 @@ infrastructure/terraform/.terraform.lock.hcl.bak
 .env.*
 !.env.example
 .DS_Store
+experiments/mlruns/
+
+# published (approved) browser models are part of the static site
+!frontend/public/moonai/**/*.onnx

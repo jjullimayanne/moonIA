@@ -1,0 +1,29 @@
+# Production: DeepMoon reproduction (Silburt et al. 2019) — 30k tiles, 112 filters.
+profile: production
+seed: 42
+data:
+  n_train: 30000
+  n_val: 5000
+  n_test: 5000
+  fixed_val_samples: 8
+model:
+  filters: 112
+  dropout: 0.15
+train:
+  epochs: 4            # as in DeepMoon; early stopping can extend via max_epochs
+  batch_size: auto
+  lr: 1.0e-4
+  weight_decay: 1.0e-6
+  early_stopping_patience: 3
+  activation_epochs: [1, 2, 3, 4]
+evaluation:
+  template_thresh: 0.5
+  target_thresh: 0.1
+  min_radius_px: 5
+  max_radius_px: 40
+gate:
+  min_val_f1: 0.50
+  allow_publish: true
+publish:
+  keep_versions: 5
+  max_upload_mb: 150

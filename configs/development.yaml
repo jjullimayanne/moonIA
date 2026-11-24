@@ -1,0 +1,30 @@
+# Development: a real but reduced experiment for iterating on the method.
+profile: development
+seed: 42
+data:
+  n_train: 2000        # sized for a 16 GB Mac with ~4 GB free RAM and ~6 GB free disk
+  n_val: 400
+  n_test: 400
+  fixed_val_samples: 6
+model:
+  filters: 32
+  dropout: 0.15
+train:
+  epochs: 10
+  eval_tiles_per_epoch: 48
+  batch_size: auto
+  lr: 1.0e-4
+  weight_decay: 1.0e-6
+  early_stopping_patience: 4
+  activation_epochs: [1, 3, 6, 10]
+evaluation:
+  template_thresh: 0.5
+  target_thresh: 0.1
+  min_radius_px: 5
+  max_radius_px: 40
+gate:
+  min_val_f1: 0.30
+  allow_publish: true
+publish:
+  keep_versions: 5
+  max_upload_mb: 60

@@ -24,7 +24,7 @@ Developed for the **Space Tech Bootcamp 2026 (FTL Brazil)**.
 | Region of interest: spherical area, crater counts, density, **GeoJSON/CSV export** (lunar CRS declared) | — | ✅ |
 | Science panel: √2-binned diameter histogram, cumulative size-frequency distribution, table view | — | ✅ |
 | ⓘ hover explanations for every layer, panel and chart | — | ✅ |
-| U-Net crater detection, model metrics, confidence | DeepMoon dataset | ⏳ Phase 4 |
+| U-Net crater detection: local training pipeline, Training Studio, experiment registry | DeepMoon dataset | ✅ pipeline · ⏳ first scientific model |
 
 ## Tech stack
 
@@ -70,6 +70,80 @@ Tests:
 cd backend && uv run pytest && uv run ruff check .
 cd frontend && npm test && npm run typecheck
 ```
+
+
+## Deep-learning pipeline (local training)
+
+All training and inference run **on your own machine** (Apple Silicon MPS, NVIDIA CUDA or CPU, detected automatically). AWS only ever stores published, approved artifacts.
+
+```bash
+make pipeline PROFILE=development      # download → preprocess → train → evaluate → ONNX → gate → publish to the local site
+make pipeline PROFILE=production PUBLISH=true   # also uploads approved artifacts to S3 (explicit opt-in)
+make resume | status | dry-run | dashboard | rollback VERSION=v1 | cost-check
+```
+
+| Profile | Train / val / test tiles | U-Net width | Epochs | Purpose |
+|---|---|---|---|---|
+| `smoke` | 64 / 32 / 0 | 16 | 3 | checks the whole pipeline in ~30 s; **never published as a model** |
+| `development` | 2 000 / 400 / 400 | 32 | 10 | real reduced experiment, sized for a 16 GB Mac |
+| `production` | 30 000 / 5 000 / 5 000 | 112 | 4 | DeepMoon reproduction (needs ~12 GB free disk) |
+
+### The data as it comes (DeepMoon, Zenodo 10.5281/zenodo.1133969)
+
+Measured on the downloaded tiles, not copied from the paper:
+
+| | Raw format |
+|---|---|
+| **Input** `input_images` | `uint8`, 256 × 256 px, one channel. Each tile is an **orthographic re-projection** of a square crop of the LRO LOLA + SELENE Kaguya merged DEM (downsampled to 118 m/px), resized to 256 px. Pixel values are **relative elevation** in 0–255 (observed 0–177, mean 100.3, σ 42.4). About **14 % of pixels are 0**, which is padding at the tile edges left by the projection. |
+| **Target** `target_masks` | `float32` {0, 1}: **1-pixel-wide rings** drawn at every catalogued crater rim (Head 2010 ≥ 20 km + Povilaitis 2018 5–20 km). Rims cover only **1.45 % of pixels**, a strong class imbalance. |
+| **Georeferencing** | per tile: `longlat_bounds` (lon/lat extent), `pix_distortion_coefficient`, `cll_xy`. Tiles span 2–25° of latitude, so the scale ranges from **0.26 to 2.97 km/px** (median 0.67). |
+| **Crater tables** `*_craters.hdf5` | per tile: lon, lat, diameter (km) and pixel x, y, diameter. A median of 11 craters per tile (0–189). |
+| **Split** | by **longitude band**: train −180°…−60°, validation −60°…60°, test 60°…180°. The pipeline *verifies* the bands are disjoint and refuses to train otherwise. |
+
+Only the tiles a profile needs are downloaded. The image arrays are stored contiguously in the HDF5 files, so the first *N* tiles are fetched with HTTP range requests (≈0.33 MB per tile instead of 9.9 GB per file), with every file MD5-checked against Zenodo.
+
+### Normalization and augmentation
+
+* **Input:** `x / 255 → [0, 1]`, the exact convention of the published data. Padding stays at 0. The same rule is stored in the model metadata (`normalization: divide_by 255`) so browser inference reproduces it.
+* **Target:** binarized (`> 0.5`) and stored as `uint8`.
+* **Augmentation (training only):** random 90° rotations and horizontal flips. These are the only transforms that keep circular rims circular and avoid interpolating elevation values. No shear, scaling or color jitter.
+
+### Network architecture: U-Net (after DeepMoon, Silburt et al. 2019)
+
+```
+input 1×256×256 (DEM, [0,1])
+ ├─ enc1: [conv3×3 → ReLU] ×2 → F      ──────────────────────────────┐ skip
+ │  maxpool 2×2 → 128²                                                │
+ ├─ enc2: [conv3×3 → ReLU] ×2 → 2F     ────────────────────┐ skip      │
+ │  maxpool → 64²                                          │           │
+ ├─ enc3: [conv3×3 → ReLU] ×2 → 4F     ─────────┐ skip      │           │
+ │  maxpool → 32²                               │           │           │
+ ├─ bottleneck: [conv3×3 → ReLU] ×2 → 4F         │           │           │
+ ├─ up ×2 (nearest) ⊕ enc3 → dropout → [conv → ReLU]×2 → 2F  │           │
+ ├─ up ×2 ⊕ enc2 → dropout → [conv → ReLU]×2 → F             │           │
+ ├─ up ×2 ⊕ enc1 → dropout → [conv → ReLU]×2 → F                         │
+ └─ conv1×1 → 1×256×256 logits → sigmoid = probability that a pixel is a crater rim
+```
+
+| | DeepMoon (paper/code) | MoonAI |
+|---|---|---|
+| Filters F | 112 | 112 (production) · 32 (development) · 16 (smoke) |
+| Parameters | — | ≈10.3 M at F = 112 · ≈0.84 M at F = 32 |
+| Dropout | 0.15 | 0.15 (`Dropout2d`, decoder) |
+| Init | He-normal | He-normal (Kaiming) |
+| Loss | binary cross-entropy on sigmoid | `BCEWithLogitsLoss` (same objective, numerically stabler) |
+| Optimizer | Adam, lr 1e-4, L2 1e-6 | Adam, lr 1e-4, weight decay 1e-6, ReduceLROnPlateau ×0.5 |
+| Batch / epochs | 8 / 4 | automatic from free memory (halved on OOM) / per profile, early stopping |
+| Framework | Keras | PyTorch 2.15 (MPS / CUDA / CPU) → ONNX opset 17 |
+
+### From pixels to craters (evaluation)
+
+1. Threshold the predicted probability at **0.1** and run **ring template matching** for radii 5–40 px, keeping correlation > **0.5**. Near-duplicates are merged with DeepMoon's criteria: Δpos²/r² < 1.8 and Δr/r < 1.0.
+2. Match detections **one-to-one** to the catalog craters of each tile under the same criteria, which gives precision, recall, F1, and location and diameter errors. The pixel IoU of the rim map is reported too.
+3. Convert pixels to lunar **lon/lat/diameter** with DeepMoon's inverse orthographic transform (verified against the catalog: median error 0.01° lon, 0.002° lat, 0 % diameter).
+4. **Quality gate** (validation set only): ONNX ≡ PyTorch (max |Δp| ≤ 1e-3), size limit, minimum F1, and it must beat the currently published model. The **test set** is evaluated once, only for an approved model.
+
+**Post-processing ceiling.** Run on the *ground-truth* rings themselves, the matcher reaches precision 0.88 / recall 0.86 when rims are ~3 px wide (typical CNN output), but only recall 0.42 on the perfect 1-px rings. A 2-px template correlates weakly with 1-px lines. This is a property of DeepMoon's post-processing and is kept unchanged for comparability.
 
 ## Scientific foundations
 

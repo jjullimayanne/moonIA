@@ -42,7 +42,7 @@
 
 * No EC2, RDS, NAT Gateway, ALB, Kubernetes or SageMaker, and **nothing billed per hour**.
 * Region `us-east-1`, free `*.cloudfront.net` domain, `PriceClass_100`.
-* HTTP API throttling: 5 rps steady, burst 10. Lambda reserved concurrency: 2.
+* HTTP API throttling: 5 rps steady, burst 10. Lambda reserved concurrency: **disabled by default** because this account's Lambda concurrency quota is 10, and AWS rejects reservations that leave fewer than 10 unreserved. The API throttle is the effective cap. Request a free quota increase, then set `lambda_reserved_concurrency = 2`.
 * Logs retained 7 days; no API access logs.
 * Aggressive caching: hashed assets 1 year immutable, Cesium/catalogs 7 days, `index.html` no-cache, published model versions immutable, `latest.json` **1 h** (models update at most daily; the frontend reads it once per page load, no polling), DEM samples 30 days.
 * S3 lifecycle: artifacts expire after 30 days and incomplete uploads are aborted. The publisher keeps at most *N* model versions.

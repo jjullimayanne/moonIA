@@ -186,7 +186,7 @@ export default function TrainingStudio() {
 
           {samples.data && shownEpoch != null && (
             <Card title={`Fixed validation tiles · epoch ${shownEpoch}`}>
-              <div className="mb-2 grid grid-cols-[120px_1fr_1fr_1fr] gap-3 text-[10px] tracking-wider text-regolith-400 uppercase">
+              <div className="mb-2 grid grid-cols-[120px_repeat(3,minmax(0,200px))] gap-3 text-[10px] tracking-wider text-regolith-400 uppercase">
                 <span />
                 <span>DEM input</span>
                 <span>Ground truth rims</span>
@@ -194,7 +194,7 @@ export default function TrainingStudio() {
               </div>
               <div className="space-y-3">
                 {samples.data.samples.map((s) => (
-                  <div key={s.id} className="grid grid-cols-[120px_1fr_1fr_1fr] items-center gap-3">
+                  <div key={s.id} className="grid grid-cols-[120px_repeat(3,minmax(0,200px))] items-center gap-3">
                     <div className="num text-[10px] text-regolith-400">
                       {s.id}
                       <br />

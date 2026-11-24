@@ -1,0 +1,15 @@
+{
+  "experiment_id": "smoke-20261124-115816-0b5ebde",
+  "status": "completed",
+  "epoch": 3,
+  "total_epochs": 3,
+  "step": 1,
+  "total_steps": 1,
+  "metrics": {
+    "val_iou": 0.0625,
+    "val_precision": 0.0,
+    "val_recall": 0.0,
+    "val_f1": 0.0
+  },
+  "updated_at": "2026-11-24T14:59:00Z"
+}

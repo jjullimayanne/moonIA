@@ -32,9 +32,9 @@ variable "lambda_memory_mb" {
 }
 
 variable "lambda_reserved_concurrency" {
-  description = "Hard cap on concurrent Lambda executions (cost/abuse guard). Set to -1 if the account's total concurrency quota is 10 (new accounts) — AWS then rejects any reservation."
+  description = "Hard cap on concurrent Lambda executions. -1 = no reservation: this account's total quota is 10 (checked 2026-11-24) and AWS rejects reservations that leave < 10 unreserved. HTTP API throttling (5 rps / burst 10) is then the effective cap. After a (free) quota increase, set 2."
   type        = number
-  default     = 2
+  default     = -1
 }
 
 variable "api_rate_limit" {

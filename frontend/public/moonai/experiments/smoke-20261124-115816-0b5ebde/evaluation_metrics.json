@@ -1,0 +1,132 @@
+{
+  "validation": {
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "n_match": 0,
+    "n_true": 314,
+    "n_pred": 0,
+    "loc_err_median": null,
+    "diam_err_median": null,
+    "by_radius_px": [
+      {
+        "r_px": [
+          5,
+          7
+        ],
+        "n_true": 100,
+        "recall": 0.0
+      },
+      {
+        "r_px": [
+          7,
+          10
+        ],
+        "n_true": 97,
+        "recall": 0.0
+      },
+      {
+        "r_px": [
+          10,
+          14
+        ],
+        "n_true": 45,
+        "recall": 0.0
+      },
+      {
+        "r_px": [
+          14,
+          20
+        ],
+        "n_true": 35,
+        "recall": 0.0
+      },
+      {
+        "r_px": [
+          20,
+          28
+        ],
+        "n_true": 24,
+        "recall": 0.0
+      },
+      {
+        "r_px": [
+          28,
+          40
+        ],
+        "n_true": 13,
+        "recall": 0.0
+      }
+    ],
+    "by_resolution": [
+      {
+        "km_per_px": [
+          0.25,
+          0.5
+        ],
+        "tiles": 12,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      {
+        "km_per_px": [
+          0.5,
+          1.0
+        ],
+        "tiles": 8,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      {
+        "km_per_px": [
+          1.0,
+          2.0
+        ],
+        "tiles": 6,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      {
+        "km_per_px": [
+          2.0,
+          4.0
+        ],
+        "tiles": 6,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    ],
+    "postprocess_ms_per_tile": 121.8,
+    "iou": 0.0625,
+    "inference_ms_per_tile": 4.18,
+    "device": "mps",
+    "best_epoch": 3,
+    "tiles": 32
+  },
+  "test": null,
+  "onnx": {
+    "path": "/Users/julli/bootcamp/moonai/artifacts/runs/smoke-20261124-115816-0b5ebde/model/model.onnx",
+    "opset": 17,
+    "size_mb": 0.81,
+    "sha256": "f4cd647e251ab7442b7d262a156e811207b9767b75c2c919c973d7a8df7c0afb",
+    "max_abs_diff_vs_torch": 2.682209014892578e-07,
+    "cpu_inference_ms_per_tile": 15.8,
+    "best_epoch": 3,
+    "int8": {
+      "path": "/Users/julli/bootcamp/moonai/artifacts/runs/smoke-20261124-115816-0b5ebde/model/model.int8.onnx",
+      "size_mb": 0.23,
+      "max_abs_prob_diff_vs_fp32": 0.013504207134246826
+    }
+  },
+  "gate": {
+    "approved": false,
+    "reasons": [
+      "profile 'smoke' is never published as a model"
+    ]
+  },
+  "notes": "Precision is a lower bound: unmatched detections may be real uncatalogued craters."
+}

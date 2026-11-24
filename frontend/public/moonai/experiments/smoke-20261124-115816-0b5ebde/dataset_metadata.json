@@ -1,0 +1,60 @@
+{
+  "source": "https://zenodo.org/api/records/1133969",
+  "doi": "10.5281/zenodo.1133969",
+  "license": "CC-BY-SA-4.0",
+  "citation": "Silburt et al. (2019), Lunar crater identification via deep learning, Icarus 317, 27-38",
+  "dataset_version": "deepmoon-zenodo-1133969",
+  "splits": {
+    "train": {
+      "complete": true,
+      "split": "train",
+      "n": 64,
+      "source_file": "train_images.hdf5",
+      "source_md5": "83c1f8b4c7c0c9a9a9c7674ff489ef0a",
+      "source_url": "https://zenodo.org/api/records/1133969/files/train_images.hdf5/content",
+      "extracted_at": "2026-11-24T14:53:41Z",
+      "sha256": "0b449639677577699ef46182eb302fa1daf353b2d1d0c7866b563f7dab82db29",
+      "lon_range": [
+        -178.4140625,
+        -62.4453125
+      ],
+      "lat_range": [
+        -57.984375,
+        59.98046875
+      ],
+      "crs": "Moon sphere R=1737.4 km; tiles are orthographic crops of the 118 m/px LOLA-Kaguya DEM",
+      "normalization": "uint8 elevation; model input = x / 255"
+    },
+    "val": {
+      "complete": true,
+      "split": "val",
+      "n": 32,
+      "source_file": "dev_images.hdf5",
+      "source_md5": "dbd05ba31eac639c3e6f4efaaa946ae9",
+      "source_url": "https://zenodo.org/api/records/1133969/files/dev_images.hdf5/content",
+      "extracted_at": "2026-11-24T14:51:48Z",
+      "sha256": "c3aa75da18da2a445957101828721d492e8edd1f79d3d0ae17ab5c3ed3c1b78e",
+      "lon_range": [
+        -59.53125,
+        59.75390625
+      ],
+      "lat_range": [
+        -52.84375,
+        59.65234375
+      ],
+      "crs": "Moon sphere R=1737.4 km; tiles are orthographic crops of the 118 m/px LOLA-Kaguya DEM",
+      "normalization": "uint8 elevation; model input = x / 255"
+    }
+  },
+  "longitude_bands": {
+    "train": [
+      -178.4140625,
+      -62.4453125
+    ],
+    "val": [
+      -59.53125,
+      59.75390625
+    ]
+  },
+  "leakage_check": "passed: train/val/test longitude bands are disjoint"
+}
