@@ -240,13 +240,31 @@ Run `development-20261124-115919-0b5ebde`: 2 000 training / 400 validation / 400
 Interpretation, honestly stated:
 * This is a **reduced reproduction**. It used 7 % of DeepMoon's training tiles, a 3.5× narrower network, and 10 short epochs, so it is far from DeepMoon's 92 % recall. Detections are **precise** (≈70 % match a catalogued crater, and the rest may be real uncatalogued craters) but **recall is low**, especially for large craters. With 3 levels of pooling, the receptive field is smaller than big rims.
 * Test recall is lower than validation recall. The test band (60°–180° E) is dominated by far-side highlands, with more numerous and overlapping craters (8 670 catalogued vs 3 883 in the same number of validation tiles). A plausible explanation, **not yet tested**, is a terrain shift. The stratified terrain analysis (mare vs highland) is the planned check.
-* **Next experiment:** the production profile (30 k tiles, F = 112), plus a class-balanced loss for the 1.45 % rim pixels.
+* **Next experiment:** see *Why v1 underperforms, and what v2 changes* below.
 * ONNX matches PyTorch to 2·10⁻⁶. The int8-quantized model is 0.83 MB (vs 3.21 MB) but shifts probabilities by up to 0.098, so the **fp32 model is the one published**.
 * Global deduplication merged 3 336 tile-level detections into **2 214 unique craters**. **657** of them match no catalogued crater and are shown as *candidates* in the Explorer ("Only uncatalogued") and on the **AI Discoveries** page.
 * **Independent check against the IAU gazetteer:** **321 of the 657 candidates (48.9 %)** coincide with an officially named IAU crater of similar size (within max(1.5 km, D/2), diameters within ×2). Shifting the same candidates 30–80 km at random gives **2.3 %** (5 trials), so the result is **~21× above chance**. About half of the "new" detections are therefore real craters, mostly smaller than 5 km, that the training catalogs (Head ≥ 20 km, Povilaitis 5–20 km) omit. The model found them without ever being taught them. The other half remain **unverified candidates, not confirmed discoveries**. Reproduce with `python3 scripts/iau_crosscheck.py`.
 * *Correction log:* the first computation of pixel IoU used a 0.5 threshold, above every probability this model outputs (max 0.52), and reported 0.100. It was recomputed at DeepMoon's 0.1 binarization threshold, excluding crater-free tiles, from the saved predictions.
 
 **Post-processing ceiling.** Run on the *ground-truth* rings themselves, the matcher reaches precision 0.88 / recall 0.86 when rims are ~3 px wide (typical CNN output), but only recall 0.42 on the perfect 1-px rings. A 2-px template correlates weakly with 1-px lines. This is a property of DeepMoon's post-processing and is kept unchanged for comparability.
+
+### Why v1 underperforms, and what v2 changes
+
+| # | Limitation of v1 (evidence) | v2 adjustment |
+|---|---|---|
+| 1 | **Too little data.** 2 000 training tiles is 7 % of DeepMoon's 30 000. The network saw few examples of each crater size and terrain. | **3× more data:** 6 000 training tiles. Validation and test tiles are unchanged, so v1 and v2 are directly comparable. |
+| 2 | **Class imbalance.** Only 1.45 % of pixels are rim. Unweighted BCE rewards predicting "no rim", so the outputs are timid (max probability 0.52) and faint rims fall below the 0.1 threshold. This is the main cause of the low recall. | **Rim-weighted loss:** `pos_weight = 5`, so a missed rim pixel costs 5× more. |
+| 3 | **Short training.** 10 epochs × ~14 min on a laptop, and the validation loss was still falling. | **12 epochs** with early stopping (patience 4), on a Colab T4 GPU with fp16 AMP. |
+| 4 | **Small network.** F = 32 (0.84 M parameters) and 3 pooling levels. The receptive field is smaller than large rims, so recall for 28–40 px radii is 0.05. | Not changed in v2, to isolate the effect of data and loss. The **production** profile (F = 112, 10.3 M parameters, 30 000 tiles) addresses it. |
+| 5 | **Post-processing ceiling.** The ring matcher finds only 42 % of perfect 1-px rings (see above). | Kept unchanged, for comparability with DeepMoon. |
+
+**First v2 attempt (rejected by the quality gate).** The first v2 run on Colab gave validation **P 0.307 · R 0.050 · F1 0.086**, far below v1. The gate blocked it, so the site kept serving v1.
+
+Probable cause: `pos_weight = w` multiplies the odds the network learns by *w*. Every probability was therefore inflated, while the 0.1 rim threshold and the ring matcher are calibrated for unweighted BCE. Thresholded masks became thick blobs instead of thin rings, which ruined both recall and precision.
+
+Fix (commit `560f4e7`): the logits are shifted by −log *w* before thresholding. This applies to evaluation and to the per-epoch previews. The same shift is folded into the head bias of the saved model, so the ONNX file and the browser receive calibrated probabilities. A unit test checks the odds ratio. v1 (*w* = 1) is unaffected.
+
+The cause is an inference from the code and the metrics. That run's per-epoch history was not synced, so the re-run is the confirmation. If the calibrated v2 still does not beat v1, the plan is to drop the weighting and keep only the larger dataset.
 
 ## Scientific foundations
 
