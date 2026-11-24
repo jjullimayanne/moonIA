@@ -100,7 +100,8 @@
   "epochs": [
     1,
     2,
-    3
+    3,
+    4
   ],
   "activation_layers": [
     "enc1",
@@ -111,6 +112,7 @@
   "activation_epochs": [
     1,
     2,
-    3
+    3,
+    4
   ]
 }
