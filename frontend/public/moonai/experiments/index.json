@@ -9,10 +9,10 @@
       "approved": false,
       "model_version": null,
       "metrics": {
-        "val_iou": 0.18965905799442814,
-        "val_precision": 0.6804123711340206,
-        "val_recall": 0.6156716417910447,
-        "val_f1": 0.6464250734573946
+        "val_iou": 0.18458510834037148,
+        "val_precision": 0.6652892561983471,
+        "val_recall": 0.6007462686567164,
+        "val_f1": 0.6313725490196079
       }
     },
     {
@@ -50,5 +50,5 @@
       "approved": false
     }
   ],
-  "updated_at": "2026-11-24T21:34:30Z"
+  "updated_at": "2026-11-24T21:38:30Z"
 }
