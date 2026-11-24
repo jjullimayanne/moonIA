@@ -8,7 +8,12 @@
       "status": "running",
       "approved": false,
       "model_version": null,
-      "metrics": {}
+      "metrics": {
+        "val_iou": 0.1721461970497514,
+        "val_precision": 0.6695652173913044,
+        "val_recall": 0.5746268656716418,
+        "val_f1": 0.6184738955823292
+      }
     },
     {
       "id": "development-20261124-115919-0b5ebde",
@@ -45,5 +50,5 @@
       "approved": false
     }
   ],
-  "updated_at": "2026-11-24T20:44:56Z"
+  "updated_at": "2026-11-24T20:49:32Z"
 }
