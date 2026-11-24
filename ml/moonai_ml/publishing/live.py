@@ -70,14 +70,17 @@ class LiveSync:
             if not self._git("diff", "--cached", "--quiet", check=False).returncode:
                 return  # nothing changed
             self._git("commit", "-q", "-m", message)
+            err = ""
             for attempt in range(3):
-                if self._git("push", "-q", check=False).returncode == 0:
+                r = self._git("push", "-q", check=False)
+                if r.returncode == 0:
                     self._last_push = time.time()
                     info(log, f"live sync pushed: {message}")
                     return
+                err = r.stderr
                 self._git("pull", "-q", "--rebase", "-X", "theirs", check=False)  # someone else pushed meanwhile
                 time.sleep(2 * (attempt + 1))
-            info(log, "live sync: push failed 3×, will retry at the next epoch")
+            info(log, f"live sync: push failed 3×, will retry at the next epoch · {_redact(err)}")
         except subprocess.CalledProcessError as e:  # never break training because of sync
             info(log, f"live sync skipped: {e.stderr.strip()[:200] if e.stderr else e}")
 
@@ -96,6 +99,13 @@ class LiveSync:
 
     def on_finish(self, status: str) -> None:
         self.mirror(status)
+
+
+def _redact(text: str) -> str:
+    """Last line of a git error, with the token removed (git may echo the remote URL)."""
+    token = os.environ.get("GITHUB_TOKEN")
+    line = (text or "").strip().splitlines()[-1:] or [""]
+    return (line[0].replace(token, "***") if token else line[0])[:200]
 
 
 def git_mode_ready(repo: Path) -> bool:
