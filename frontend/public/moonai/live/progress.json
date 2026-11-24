@@ -1,13 +1,13 @@
 {
   "experiment_id": "production-20261124-183448-560f4e7",
   "status": "running",
-  "epoch": 1,
+  "epoch": 2,
   "total_epochs": 4,
-  "step": 3750,
+  "step": 1820,
   "total_steps": 3750,
   "metrics": {
-    "train_loss": 0.10248861062477033
+    "train_loss": 0.08418932464485476
   },
-  "updated_at": "2026-11-24T20:46:16Z",
+  "updated_at": "2026-11-24T20:59:52Z",
   "sync_interval_s": 600
 }
