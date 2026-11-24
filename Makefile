@@ -7,7 +7,7 @@ PUBLISH ?= false
 ML      := cd ml && MLFLOW_DISABLE_AGENT_HINT=1 uv run python -m moonai_ml
 PUBFLAG := $(if $(filter true,$(PUBLISH)),--publish,)
 
-.PHONY: setup download preprocess train evaluate export predict publish pipeline resume status dry-run dashboard rollback cost-check test catalogs
+.PHONY: progress setup download preprocess train evaluate export predict publish pipeline resume status dry-run dashboard rollback cost-check test catalogs
 
 setup:            ## install backend, ML and frontend dependencies
 	cd backend && uv sync
@@ -45,3 +45,6 @@ test:             ## all test suites
 	cd backend && uv run pytest -q
 	cd ml && uv run pytest -q
 	cd frontend && npm test
+
+progress:         ## live overall progress bar of the running pipeline
+	python3 scripts/progress.py --watch

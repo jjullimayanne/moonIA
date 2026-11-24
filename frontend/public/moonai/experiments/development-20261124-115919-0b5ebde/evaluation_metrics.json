@@ -1,0 +1,260 @@
+{
+  "validation": {
+    "precision": 0.6694915254237288,
+    "recall": 0.2441411279938192,
+    "f1": 0.35780335912436306,
+    "n_match": 948,
+    "n_true": 3883,
+    "n_pred": 1416,
+    "loc_err_median": 0.11712798239518672,
+    "diam_err_median": 0.06284700041393541,
+    "by_radius_px": [
+      {
+        "r_px": [
+          5,
+          7
+        ],
+        "n_true": 1424,
+        "recall": 0.300561797752809
+      },
+      {
+        "r_px": [
+          7,
+          10
+        ],
+        "n_true": 1058,
+        "recall": 0.28544423440453687
+      },
+      {
+        "r_px": [
+          10,
+          14
+        ],
+        "n_true": 635,
+        "recall": 0.2188976377952756
+      },
+      {
+        "r_px": [
+          14,
+          20
+        ],
+        "n_true": 422,
+        "recall": 0.12796208530805686
+      },
+      {
+        "r_px": [
+          20,
+          28
+        ],
+        "n_true": 209,
+        "recall": 0.0861244019138756
+      },
+      {
+        "r_px": [
+          28,
+          40
+        ],
+        "n_true": 135,
+        "recall": 0.05185185185185185
+      }
+    ],
+    "by_resolution": [
+      {
+        "km_per_px": [
+          0,
+          0.25
+        ],
+        "tiles": 16,
+        "precision": 0.6,
+        "recall": 0.4,
+        "f1": 0.48
+      },
+      {
+        "km_per_px": [
+          0.25,
+          0.5
+        ],
+        "tiles": 98,
+        "precision": 0.65,
+        "recall": 0.36792452830188677,
+        "f1": 0.46987951807228917
+      },
+      {
+        "km_per_px": [
+          0.5,
+          1.0
+        ],
+        "tiles": 112,
+        "precision": 0.8221709006928406,
+        "recall": 0.41203703703703703,
+        "f1": 0.5489591364687741
+      },
+      {
+        "km_per_px": [
+          1.0,
+          2.0
+        ],
+        "tiles": 96,
+        "precision": 0.6228571428571429,
+        "recall": 0.2540792540792541,
+        "f1": 0.36092715231788075
+      },
+      {
+        "km_per_px": [
+          2.0,
+          4.0
+        ],
+        "tiles": 78,
+        "precision": 0.551829268292683,
+        "recall": 0.12026578073089701,
+        "f1": 0.19749045280960176
+      }
+    ],
+    "postprocess_ms_per_tile": 122.4,
+    "iou": 0.11345703417314269,
+    "inference_ms_per_tile": 8.36,
+    "device": "mps",
+    "best_epoch": 10,
+    "tiles": 400
+  },
+  "test": {
+    "precision": 0.7046875,
+    "recall": 0.1560553633217993,
+    "f1": 0.25552407932011334,
+    "n_match": 1353,
+    "n_true": 8670,
+    "n_pred": 1920,
+    "loc_err_median": 0.11563702391248792,
+    "diam_err_median": 0.05451438891561421,
+    "by_radius_px": [
+      {
+        "r_px": [
+          5,
+          7
+        ],
+        "n_true": 2747,
+        "recall": 0.22570076447033127
+      },
+      {
+        "r_px": [
+          7,
+          10
+        ],
+        "n_true": 2242,
+        "recall": 0.19714540588760035
+      },
+      {
+        "r_px": [
+          10,
+          14
+        ],
+        "n_true": 1562,
+        "recall": 0.11395646606914213
+      },
+      {
+        "r_px": [
+          14,
+          20
+        ],
+        "n_true": 1134,
+        "recall": 0.07054673721340388
+      },
+      {
+        "r_px": [
+          20,
+          28
+        ],
+        "n_true": 633,
+        "recall": 0.045813586097946286
+      },
+      {
+        "r_px": [
+          28,
+          40
+        ],
+        "n_true": 352,
+        "recall": 0.011363636363636364
+      }
+    ],
+    "by_resolution": [
+      {
+        "km_per_px": [
+          0,
+          0.25
+        ],
+        "tiles": 14,
+        "precision": 1.0,
+        "recall": 0.08333333333333333,
+        "f1": 0.15384615384615385
+      },
+      {
+        "km_per_px": [
+          0.25,
+          0.5
+        ],
+        "tiles": 88,
+        "precision": 0.8050314465408805,
+        "recall": 0.25346534653465347,
+        "f1": 0.3855421686746988
+      },
+      {
+        "km_per_px": [
+          0.5,
+          1.0
+        ],
+        "tiles": 108,
+        "precision": 0.8389955686853766,
+        "recall": 0.3317757009345794,
+        "f1": 0.4755127668480536
+      },
+      {
+        "km_per_px": [
+          1.0,
+          2.0
+        ],
+        "tiles": 124,
+        "precision": 0.618510158013544,
+        "recall": 0.1601870798012277,
+        "f1": 0.2544694683074065
+      },
+      {
+        "km_per_px": [
+          2.0,
+          4.0
+        ],
+        "tiles": 66,
+        "precision": 0.5459183673469388,
+        "recall": 0.0355718085106383,
+        "f1": 0.06679151061173533
+      }
+    ],
+    "postprocess_ms_per_tile": 125.6,
+    "iou": 0.12847383032934898,
+    "inference_ms_per_tile": 8.75,
+    "device": "mps",
+    "best_epoch": 10,
+    "tiles": 400
+  },
+  "onnx": {
+    "path": "/Users/julli/bootcamp/moonai/artifacts/runs/development-20261124-115919-0b5ebde/model/model.onnx",
+    "opset": 17,
+    "size_mb": 3.21,
+    "sha256": "611c2732a503ebfc4ce0a86acc73fcc270cd66de3ec68973d800b9924053a461",
+    "max_abs_diff_vs_torch": 2.0265579223632812e-06,
+    "cpu_inference_ms_per_tile": 48.4,
+    "best_epoch": 10,
+    "int8": {
+      "path": "/Users/julli/bootcamp/moonai/artifacts/runs/development-20261124-115919-0b5ebde/model/model.int8.onnx",
+      "size_mb": 0.83,
+      "max_abs_prob_diff_vs_fp32": 0.09841996431350708
+    }
+  },
+  "gate": {
+    "approved": true,
+    "reasons": []
+  },
+  "notes": "Precision is a lower bound: unmatched detections may be real uncatalogued craters.",
+  "corrections": [
+    "pixel IoU recomputed at threshold 0.1 (DeepMoon binarization) excluding empty tiles; the first computation used 0.5, above every predicted probability, and reported 0.100/0.008"
+  ]
+}

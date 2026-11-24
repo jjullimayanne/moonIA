@@ -109,7 +109,8 @@ def stage_evaluate(cfg: Config, run: Run, split: str = "val") -> dict:
     dets, metrics = _crater_eval(cfg, probs, gts, ds)
     from moonai_ml.evaluation.craters import pixel_iou
 
-    metrics["iou"] = float(np.mean([pixel_iou(p, ds.masks[i]) for i, p in enumerate(probs)]))
+    ious = [v for i, p in enumerate(probs) if (v := pixel_iou(p, ds.masks[i], cfg.evaluation.target_thresh)) is not None]
+    metrics["iou"] = float(np.mean(ious))
     metrics["inference_ms_per_tile"] = round(infer_ms, 2)
     metrics["device"] = str(device)
     metrics["best_epoch"] = best_epoch

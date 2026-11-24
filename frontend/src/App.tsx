@@ -7,6 +7,7 @@ import { BottomPanel } from "./components/BottomPanel";
 import { MapHud } from "./components/MapHud";
 import { MapTools } from "./components/MapTools";
 import { useMoon } from "./store";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const TrainingStudio = lazy(() => import("./pages/TrainingStudio"));
 const PipelinePage = lazy(() => import("./pages/PipelinePage"));
@@ -18,7 +19,9 @@ export default function App() {
   return (
     <div className="relative h-full w-full overflow-hidden bg-void">
       {/* the globe stays mounted across modules so returning to the map is instant */}
-      <MoonViewer />
+      <ErrorBoundary label="lunar map">
+        <MoonViewer />
+      </ErrorBoundary>
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_55%,rgba(0,0,0,0.55))]" />
       <Header />
       {page === "explorer" ? (
@@ -30,12 +33,14 @@ export default function App() {
           <MapTools />
         </>
       ) : (
+        <ErrorBoundary label="module">
         <Suspense fallback={null}>
           {page === "training" && <TrainingStudio />}
           {page === "pipeline" && <PipelinePage />}
           {page === "registry" && <ExperimentsPage />}
           {page === "playground" && <Playground />}
         </Suspense>
+        </ErrorBoundary>
       )}
     </div>
   );

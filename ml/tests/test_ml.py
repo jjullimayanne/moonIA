@@ -54,6 +54,7 @@ def test_ring_template_and_iou():
     a = np.zeros((4, 4))
     a[0, 0] = 1
     assert pixel_iou(a, a) == 1.0
+    assert pixel_iou(np.zeros((4, 4)), np.zeros((4, 4))) is None  # empty tiles are excluded, not "perfect"
 
 
 def test_pixel_to_lonlat_center_and_scale():

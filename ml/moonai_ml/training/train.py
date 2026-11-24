@@ -64,10 +64,11 @@ def evaluate(model, loader, device, crater_gt, cfg: Config, n_crater_tiles: int)
         n_px += y.numel()
         p = torch.sigmoid(logits).cpu().numpy()[:, 0]
         for pi, yi in zip(p, y.cpu().numpy()[:, 0]):
-            ious.append(pixel_iou(pi, yi))
+            ious.append(pixel_iou(pi, yi, cfg.evaluation.target_thresh))
             if len(probs) < n_crater_tiles:
                 probs.append(pi)
-    out = {"val_loss": loss_sum / n_px, "iou": float(np.mean(ious))}
+    valid = [v for v in ious if v is not None]
+    out = {"val_loss": loss_sum / n_px, "iou": float(np.mean(valid)) if valid else None}
     if crater_gt is not None:
         e = cfg.evaluation
         res = [

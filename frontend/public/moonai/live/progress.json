@@ -1,15 +1,21 @@
 {
-  "experiment_id": "smoke-20261124-115816-0b5ebde",
+  "experiment_id": "development-20261124-115919-0b5ebde",
   "status": "completed",
-  "epoch": 3,
-  "total_epochs": 3,
+  "epoch": 10,
+  "total_epochs": 10,
   "step": 1,
   "total_steps": 1,
   "metrics": {
-    "val_iou": 0.0625,
-    "val_precision": 0.0,
-    "val_recall": 0.0,
-    "val_f1": 0.0
+    "val_iou": 0.10000807122125074,
+    "val_precision": 0.6694915254237288,
+    "val_recall": 0.2441411279938192,
+    "val_f1": 0.35780335912436306,
+    "val_loc_err": 0.11712798239518672,
+    "val_diam_err": 0.06284700041393541,
+    "test_precision": 0.7046875,
+    "test_recall": 0.1560553633217993,
+    "test_f1": 0.25552407932011334,
+    "test_iou": 0.007506496400584342
   },
-  "updated_at": "2026-11-24T14:59:00Z"
+  "updated_at": "2026-11-24T15:38:51Z"
 }

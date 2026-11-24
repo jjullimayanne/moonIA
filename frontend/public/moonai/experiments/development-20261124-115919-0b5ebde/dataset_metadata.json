@@ -1,0 +1,84 @@
+{
+  "source": "https://zenodo.org/api/records/1133969",
+  "doi": "10.5281/zenodo.1133969",
+  "license": "CC-BY-SA-4.0",
+  "citation": "Silburt et al. (2019), Lunar crater identification via deep learning, Icarus 317, 27-38",
+  "dataset_version": "deepmoon-zenodo-1133969",
+  "splits": {
+    "train": {
+      "complete": true,
+      "split": "train",
+      "n": 2000,
+      "source_file": "train_images.hdf5",
+      "source_md5": "83c1f8b4c7c0c9a9a9c7674ff489ef0a",
+      "source_url": "https://zenodo.org/api/records/1133969/files/train_images.hdf5/content",
+      "extracted_at": "2026-11-24T15:13:10Z",
+      "sha256": "f5aad2248e4006b2b958bc5504de01601e684a63cfd1b164679ce4df72285abc",
+      "lon_range": [
+        -179.9609375,
+        -60.03125
+      ],
+      "lat_range": [
+        -59.86328125,
+        59.98046875
+      ],
+      "crs": "Moon sphere R=1737.4 km; tiles are orthographic crops of the 118 m/px LOLA-Kaguya DEM",
+      "normalization": "uint8 elevation; model input = x / 255"
+    },
+    "val": {
+      "complete": true,
+      "split": "val",
+      "n": 400,
+      "source_file": "dev_images.hdf5",
+      "source_md5": "dbd05ba31eac639c3e6f4efaaa946ae9",
+      "source_url": "https://zenodo.org/api/records/1133969/files/dev_images.hdf5/content",
+      "extracted_at": "2026-11-24T15:18:49Z",
+      "sha256": "7ad4816328429245c93eb6d23621dab16f70c792922c2df58ec570a1a8e5eba7",
+      "lon_range": [
+        -59.8671875,
+        59.75390625
+      ],
+      "lat_range": [
+        -59.77734375,
+        59.86328125
+      ],
+      "crs": "Moon sphere R=1737.4 km; tiles are orthographic crops of the 118 m/px LOLA-Kaguya DEM",
+      "normalization": "uint8 elevation; model input = x / 255"
+    },
+    "test": {
+      "complete": true,
+      "split": "test",
+      "n": 400,
+      "source_file": "test_images.hdf5",
+      "source_md5": "9045f7f91a0a10175a6e384a8bbabf63",
+      "source_url": "https://zenodo.org/api/records/1133969/files/test_images.hdf5/content",
+      "extracted_at": "2026-11-24T15:23:15Z",
+      "sha256": "bb8d73cb908e2f5e46dd95b8a377c145d9782d55ee8c3af81c6cd1c14379de28",
+      "lon_range": [
+        60.76171875,
+        179.66796875
+      ],
+      "lat_range": [
+        -59.96875,
+        59.6875
+      ],
+      "crs": "Moon sphere R=1737.4 km; tiles are orthographic crops of the 118 m/px LOLA-Kaguya DEM",
+      "normalization": "uint8 elevation; model input = x / 255"
+    }
+  },
+  "longitude_bands": {
+    "train": [
+      -179.9609375,
+      -60.03125
+    ],
+    "val": [
+      -59.8671875,
+      59.75390625
+    ],
+    "test": [
+      60.76171875,
+      179.66796875
+    ]
+  },
+  "leakage_check": "passed: train/val/test longitude bands are disjoint"
+}

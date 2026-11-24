@@ -239,9 +239,9 @@ export function MoonViewer() {
       if (!coll) continue;
       coll.removeAll();
       if (!catalogs[id] || !data) continue;
-      const material = Material.fromType("Color", {
-        color: Color.fromCssColorString(CATALOG_STYLE[id].mapColor).withAlpha(0.6),
-      });
+      // One Material per polyline: Cesium destroys a polyline's material when the polyline is
+      // removed, so a shared instance breaks the next removeAll()/destroy (DeveloperError).
+      const rimColor = Color.fromCssColorString(CATALOG_STYLE[id].mapColor).withAlpha(0.6);
       for (const c of data) {
         if (c.diameter_km < dmin || c.diameter_km > dmax) continue;
         visible.push(c);
@@ -253,7 +253,12 @@ export function MoonViewer() {
         for (let i = 0; i < ring.length; i += 2) heights.push(ring[i], ring[i + 1], h);
         // level of detail: a crater's rim appears once the camera is within ~120× its diameter
         const ddc = new DistanceDisplayCondition(0, Math.max(800_000, c.diameter_km * 120_000));
-        coll.add({ positions: Cartesian3.fromDegreesArrayHeights(heights, MOON), width: 1, material, distanceDisplayCondition: ddc });
+        coll.add({
+          positions: Cartesian3.fromDegreesArrayHeights(heights, MOON),
+          width: 1,
+          material: Material.fromType("Color", { color: rimColor }),
+          distanceDisplayCondition: ddc,
+        });
       }
     }
     pickRef.current.craters = visible;
@@ -269,7 +274,7 @@ export function MoonViewer() {
     coll.removeAll();
     const list = showDetections && detections.data ? detections.data.filter((d) => !discoveryOnly || !d.catalog_match) : [];
     detPickRef.current = list;
-    const material = Material.fromType("PolylineDash", { color: Color.fromCssColorString(DETECTION_STYLE.mapColor), dashLength: 10 });
+    const detColor = Color.fromCssColorString(DETECTION_STYLE.mapColor);
     for (const d of list) {
       const ring = craterRim(d.lon, d.lat, d.diameter_km, 48);
       const pts: number[] = [];
@@ -277,7 +282,7 @@ export function MoonViewer() {
       coll.add({
         positions: Cartesian3.fromDegreesArrayHeights(pts, MOON),
         width: 2,
-        material,
+        material: Material.fromType("PolylineDash", { color: detColor, dashLength: 10 }), // per polyline, see rims
         distanceDisplayCondition: new DistanceDisplayCondition(0, Math.max(1_200_000, d.diameter_km * 150_000)),
       });
     }

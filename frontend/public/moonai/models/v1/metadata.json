@@ -1,0 +1,24 @@
+{
+  "experiment_id": "development-20261124-115919-0b5ebde",
+  "trained_at": "2026-11-24T14:59:19Z",
+  "dataset_version": "deepmoon-zenodo-1133969",
+  "input": {
+    "shape": [
+      1,
+      1,
+      256,
+      256
+    ],
+    "dtype": "float32",
+    "layout": "NCHW",
+    "name": "dem"
+  },
+  "normalization": {
+    "method": "scale",
+    "params": {
+      "divide_by": 255.0
+    }
+  },
+  "output": "logits \u2192 sigmoid = rim probability",
+  "opset": 17
+}

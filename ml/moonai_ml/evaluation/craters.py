@@ -122,11 +122,16 @@ def recall_by_radius(results: list[MatchResult], edges=(5, 7, 10, 14, 20, 28, 40
     return out
 
 
-def pixel_iou(prob: np.ndarray, mask: np.ndarray, thresh: float = 0.5) -> float:
+def pixel_iou(prob: np.ndarray, mask: np.ndarray, thresh: float = 0.1) -> float | None:
+    """Rim-pixel IoU after DeepMoon's binarization (target_thresh = 0.1).
+
+    Returns None when both maps are empty, so crater-free tiles do not count as a
+    perfect 1.0 (that inflated the mean in early runs).
+    """
     p = prob >= thresh
     t = mask > 0.5
     union = (p | t).sum()
-    return float((p & t).sum() / union) if union else 1.0
+    return float((p & t).sum() / union) if union else None
 
 
 def pixels_to_lonlat_km(coords: np.ndarray, llbd: np.ndarray, distortion: float, dim: int = 256) -> np.ndarray:

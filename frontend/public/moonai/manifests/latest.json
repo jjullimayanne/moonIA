@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "version": "v1",
+  "experiment_id": "development-20261124-115919-0b5ebde",
+  "trained_at": "2026-11-24T14:59:19Z",
+  "published_at": "2026-11-24T15:38:51Z",
+  "dataset_version": "deepmoon-zenodo-1133969",
+  "model_url": "moonai/models/v1/model.onnx",
+  "predictions_url": "moonai/predictions/v1/craters.geojson",
+  "sha256": "611c2732a503ebfc4ce0a86acc73fcc270cd66de3ec68973d800b9924053a461",
+  "input": {
+    "shape": [
+      1,
+      1,
+      256,
+      256
+    ],
+    "dtype": "float32",
+    "layout": "NCHW",
+    "name": "dem"
+  },
+  "normalization": {
+    "method": "scale",
+    "params": {
+      "divide_by": 255.0
+    }
+  },
+  "metrics": {
+    "val_iou": 0.11345703417314269,
+    "val_precision": 0.6694915254237288,
+    "val_recall": 0.2441411279938192,
+    "val_f1": 0.35780335912436306,
+    "val_loc_err": 0.11712798239518672,
+    "val_diam_err": 0.06284700041393541,
+    "test_precision": 0.7046875,
+    "test_recall": 0.1560553633217993,
+    "test_f1": 0.25552407932011334,
+    "test_iou": 0.12847383032934898
+  }
+}

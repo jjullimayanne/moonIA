@@ -6,7 +6,7 @@ Developed for the **Space Tech Bootcamp 2026 (FTL Brazil)**.
 
 ![MoonAI — Tycho crater with LOLA + Kaguya color hillshade, Head 2010 crater rims and live DEM readout](docs/assets/moonai-tycho.jpg)
 
-> **Status (Phase 2 of 7).** The lunar map, real data layers, crater catalogs, terrain readout and science panel are **operational**. The deep-learning detector is **not trained yet**, and the UI says so explicitly: no simulated detections or metrics are ever shown as real.
+> **Status.** Lunar map, real data layers, catalogs, terrain readout, local training pipeline and the first trained model (**v1**, a reduced DeepMoon reproduction; see Results) are operational. All metrics shown come from real runs. Smoke runs are labelled as such, and nothing is simulated.
 
 ---
 
@@ -24,7 +24,7 @@ Developed for the **Space Tech Bootcamp 2026 (FTL Brazil)**.
 | Region of interest: spherical area, crater counts, density, **GeoJSON/CSV export** (lunar CRS declared) | — | ✅ |
 | Science panel: √2-binned diameter histogram, cumulative size-frequency distribution, table view | — | ✅ |
 | ⓘ hover explanations for every layer, panel and chart | — | ✅ |
-| U-Net crater detection: local training pipeline, Training Studio, experiment registry | DeepMoon dataset | ✅ pipeline · ⏳ first scientific model |
+| U-Net crater detection: model v1 trained locally, AI detections layer, Training Studio, AI Playground (browser inference), experiment registry | DeepMoon dataset | ✅ real (reduced reproduction) |
 
 ## Tech stack
 
@@ -143,6 +143,31 @@ input 1×256×256 (DEM, [0,1])
 3. Convert pixels to lunar **lon/lat/diameter** with DeepMoon's inverse orthographic transform (verified against the catalog: median error 0.01° lon, 0.002° lat, 0 % diameter).
 4. **Quality gate** (validation set only): ONNX ≡ PyTorch (max |Δp| ≤ 1e-3), size limit, minimum F1, and it must beat the currently published model. The **test set** is evaluated once, only for an approved model.
 
+### Results: model v1 (development profile, trained locally on Apple Silicon)
+
+Run `development-20261124-115919-0b5ebde`: 2 000 training / 400 validation / 400 test tiles, U-Net F = 32 (0.84 M parameters), 10 epochs × ~82 s on MPS (batch 4), about 14 min of training. Passed the quality gate and published as **v1**.
+
+| Metric | Validation (−60°…60° lon) | **Test (60°…180° lon, evaluated once)** |
+|---|---|---|
+| Precision (vs. catalog, lower bound) | 0.669 | **0.705** |
+| Recall | 0.244 | **0.156** |
+| F1 | 0.358 | **0.256** |
+| Median location error (Δpos / r) | 0.117 | 0.116 |
+| Median diameter error (Δr / r) | 0.063 | 0.055 |
+| Rim-pixel IoU (threshold 0.1) | 0.114 | 0.129 |
+| Inference | 8.4 ms/tile (MPS) · 48 ms/tile (ONNX CPU) · ~320 ms/tile (browser, wasm 1 thread) | |
+
+**Recall vs. crater size** (validation, radius in pixels): 5–7 px **0.30** · 7–10 px 0.29 · 10–14 px 0.22 · 14–20 px 0.13 · 20–28 px 0.09 · 28–40 px **0.05**.
+**F1 vs. resolution** (km/px): < 0.25: 0.48 · 0.25–0.5: 0.47 · 0.5–1: **0.55** · 1–2: 0.36 · 2–4: **0.20**.
+
+Interpretation, honestly stated:
+* This is a **reduced reproduction**. It used 7 % of DeepMoon's training tiles, a 3.5× narrower network, and 10 short epochs, so it is far from DeepMoon's 92 % recall. Detections are **precise** (≈70 % match a catalogued crater, and the rest may be real uncatalogued craters) but **recall is low**, especially for large craters. With 3 levels of pooling, the receptive field is smaller than big rims.
+* Test recall is lower than validation recall. The test band (60°–180° E) is dominated by far-side highlands, with more numerous and overlapping craters (8 670 catalogued vs 3 883 in the same number of validation tiles). A plausible explanation, **not yet tested**, is a terrain shift. The stratified terrain analysis (mare vs highland) is the planned check.
+* **Next experiment:** the production profile (30 k tiles, F = 112), plus a class-balanced loss for the 1.45 % rim pixels.
+* ONNX matches PyTorch to 2·10⁻⁶. The int8-quantized model is 0.83 MB (vs 3.21 MB) but shifts probabilities by up to 0.098, so the **fp32 model is the one published**.
+* Global deduplication merged 3 336 tile-level detections into **2 214 unique craters**. **657** of them match no catalogued crater and are shown as *candidates* in the Explorer ("Only uncatalogued"). They are **not confirmed discoveries**.
+* *Correction log:* the first computation of pixel IoU used a 0.5 threshold, above every probability this model outputs (max 0.52), and reported 0.100. It was recomputed at DeepMoon's 0.1 binarization threshold, excluding crater-free tiles, from the saved predictions.
+
 **Post-processing ceiling.** Run on the *ground-truth* rings themselves, the matcher reaches precision 0.88 / recall 0.86 when rims are ~3 px wide (typical CNN output), but only recall 0.42 on the perfect 1-px rings. A 2-px template correlates weakly with 1-px lines. This is a property of DeepMoon's post-processing and is kept unchanged for comparability.
 
 ## Scientific foundations
@@ -177,8 +202,8 @@ Docs:
 1. ✅ Scientific validation and real-data access
 2. ✅ Frontend with lunar map and real geospatial layers
 3. ⏳ Data-processing pipeline (DeepMoon HDF5 streaming, DEM tiling)
-4. ⏳ U-Net training and scientific evaluation (local / Apple Silicon MPS / Colab)
-5. ⏳ Inference integration: ONNX Runtime Web in a Web Worker, versioned models via `latest.json`
+4. 🟡 U-Net training and scientific evaluation: v1 (development) done; production reproduction pending
+5. ✅ Inference integration: ONNX Runtime Web in a Web Worker, versioned models via `latest.json`
 6. ⏳ Topographic analysis and stratified scientific results
 7. ⏳ Documentation and presentation
 

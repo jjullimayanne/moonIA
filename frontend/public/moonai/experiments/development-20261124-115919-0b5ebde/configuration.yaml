@@ -1,0 +1,38 @@
+profile: development
+seed: 42
+data:
+  n_train: 2000
+  n_val: 400
+  n_test: 400
+  fixed_val_samples: 6
+model:
+  filters: 32
+  dropout: 0.15
+train:
+  epochs: 10
+  batch_size: auto
+  lr: 0.0001
+  weight_decay: 1.0e-06
+  early_stopping_patience: 4
+  activation_epochs:
+  - 1
+  - 3
+  - 6
+  - 10
+  eval_tiles_per_epoch: 48
+  progress_every_steps: 20
+evaluation:
+  template_thresh: 0.5
+  target_thresh: 0.1
+  min_radius_px: 5
+  max_radius_px: 40
+  longlat_thresh2: 1.8
+  rad_thresh: 1.0
+gate:
+  min_val_f1: 0.3
+  allow_publish: true
+  max_onnx_mb: 60.0
+  onnx_atol: 0.001
+publish:
+  keep_versions: 5
+  max_upload_mb: 60.0
