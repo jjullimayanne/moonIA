@@ -1,0 +1,36 @@
+[project]
+name = "moonai-backend"
+version = "0.1.0"
+description = "MoonAI backend — lunar geospatial API (FastAPI) and data ingestion"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.165.0",
+    "mangum>=0.22.0",
+    "numpy>=2.5.5",
+    "pydantic-settings>=2.16.3",
+    "rasterio>=1.5.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.6",
+    "uvicorn[standard]>=0.54.0",
+]
+ingest = [
+    "httpx>=0.28.1",
+    "pandas>=3.1.1",
+    "pyshp>=3.1.9",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+extend-exclude = ["build", "dist"]
+
+[tool.uv]
+package = false
+default-groups = ["dev", "ingest"]

@@ -1,0 +1,14 @@
+# Local stack. Training is NOT containerized: on macOS it must run natively to use MPS.
+services:
+  backend:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    ports: ["8000:8000"]
+    env_file: [{ path: .env, required: false }]
+    environment:
+      MOONAI_DATA_DIR: /srv/data
+  frontend:
+    build:
+      context: frontend
+      args: { VITE_API_URL: "http://localhost:8000" }
+    ports: ["8080:80"]
+    depends_on: [backend]

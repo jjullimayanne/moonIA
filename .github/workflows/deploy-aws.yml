@@ -1,0 +1,48 @@
+# Manual-only AWS deploy (S3 + CloudFront + Lambda) through OIDC — no stored keys.
+# Requires `terraform apply` first and these repository variables:
+#   AWS_DEPLOY_ROLE_ARN, SITE_BUCKET, ARTIFACTS_BUCKET, LAMBDA_FUNCTION, CLOUDFRONT_DISTRIBUTION_ID
+name: Deploy to AWS (manual)
+on: workflow_dispatch
+
+permissions: { contents: read, id-token: write }
+concurrency: { group: aws-deploy, cancel-in-progress: false }
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v5
+        with: { node-version: 24, cache: npm, cache-dependency-path: frontend/package-lock.json }
+
+      - name: Build & ship Lambda
+        run: |
+          backend/scripts/build_lambda.sh
+          KEY="lambda/$(md5sum backend/dist/lambda.zip | cut -d' ' -f1).zip"
+          aws s3 cp backend/dist/lambda.zip "s3://${{ vars.ARTIFACTS_BUCKET }}/$KEY"
+          aws lambda update-function-code --function-name "${{ vars.LAMBDA_FUNCTION }}" \
+            --s3-bucket "${{ vars.ARTIFACTS_BUCKET }}" --s3-key "$KEY" --publish > /dev/null
+
+      - name: Build frontend (same-origin API)
+        working-directory: frontend
+        run: npm ci && npm run build
+        env: { VITE_BASE: /, VITE_API_URL: "" }
+
+      - name: Upload with cache headers
+        run: |
+          B="s3://${{ vars.SITE_BUCKET }}"
+          # content-hashed bundles: cache forever
+          aws s3 sync frontend/dist/assets "$B/assets" --delete --cache-control "public,max-age=31536000,immutable"
+          # cesium runtime + catalogs: versioned by deploy, cache 7 days
+          aws s3 sync frontend/dist/cesium "$B/cesium" --delete --cache-control "public,max-age=604800"
+          aws s3 sync frontend/dist/data "$B/data" --delete --cache-control "public,max-age=604800"
+          # entry point: always revalidate
+          aws s3 cp frontend/dist/index.html "$B/index.html" --cache-control "no-cache"
+          aws cloudfront create-invalidation --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths /index.html /data/* > /dev/null
