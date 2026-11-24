@@ -8,10 +8,10 @@
 
 locals {
   # AWS managed policies (IDs are global constants)
-  cache_optimized_id              = "658327ea-f89d-4fab-a63d-7e88639e58f6" # CachingOptimized: honors origin Cache-Control
-  origin_req_all_except_host      = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # AllViewerExceptHostHeader
-  security_headers_policy_id      = "67f7725c-6f97-4210-82d7-5512b31e9d03" # SecurityHeadersPolicy
-  api_origin_domain               = replace(aws_apigatewayv2_api.http.api_endpoint, "https://", "")
+  cache_optimized_id         = "658327ea-f89d-4fab-a63d-7e88639e58f6" # CachingOptimized: honors origin Cache-Control
+  origin_req_all_except_host = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # AllViewerExceptHostHeader
+  security_headers_policy_id = "67f7725c-6f97-4210-82d7-5512b31e9d03" # SecurityHeadersPolicy
+  api_origin_domain          = replace(aws_apigatewayv2_api.http.api_endpoint, "https://", "")
 }
 
 resource "aws_cloudfront_origin_access_control" "s3" {
