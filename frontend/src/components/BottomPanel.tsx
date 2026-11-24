@@ -1,11 +1,9 @@
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ChevronDown, ChevronUp, BarChart3, Table2 } from "lucide-react";
 import { useMoon } from "../store";
 import { useScopeCraters } from "../data/scope";
 import { CATALOG_STYLE, type CatalogId } from "../data/catalogs";
 import { cumulativeSfd, histogram, median } from "../lib/stats";
-import { Badge } from "./Panel";
 import { InfoTip } from "./InfoTip";
 import { GLOSSARY } from "../data/glossary";
 
@@ -52,13 +50,14 @@ function Legend({ ids }: { ids: CatalogId[] }) {
 }
 
 export function BottomPanel() {
-  const { panels, togglePanel, catalogs } = useMoon();
+  const { panels, catalogs } = useMoon();
   const scope = useScopeCraters();
-  const [table, setTable] = useState(false);
+  const [view, setView] = useState<"hist" | "sfd" | "table">("hist");
   const active = IDS.filter((id) => catalogs[id]);
 
   const hist = useMemo(
     () => histogram(Object.fromEntries(active.map((id) => [id, scope.byCatalog[id].map((c) => c.diameter_km)])), 4, 1500),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [scope, active.join()],
   );
   const sfd = useMemo(() => {
@@ -75,40 +74,51 @@ export function BottomPanel() {
         }),
       ),
     }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, active.join()]);
 
   const diams = scope.all.map((c) => c.diameter_km);
   const trimmed = hist.filter((b) => active.some((id) => (b[id] as number) > 0));
+  const tabs = [
+    ["hist", "Size distribution", GLOSSARY.histogram],
+    ["sfd", "Cumulative SFD", GLOSSARY.sfd],
+    ["table", "Table", "The size distribution as a table (accessible view)."],
+  ] as const;
 
   return (
-    <>
-      <section
-        className={`glass absolute right-3 bottom-3 left-3 z-10 h-[212px] rounded-xl transition-all duration-300 ${
-          panels.bottom ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-[120%] opacity-0"
-        }`}
-      >
-        <div className="grid h-full grid-cols-[200px_1fr_1fr_220px] gap-5 px-5 py-4">
-          <div className="flex flex-col justify-between">
-            <Stat label={scope.scope === "roi" ? "Craters in region" : "Craters (filtered)"} value={scope.all.length.toLocaleString()} info={GLOSSARY.count} sub={active.map((id) => `${CATALOG_STYLE[id].short}: ${scope.byCatalog[id].length.toLocaleString()}`).join(" · ") || "no catalog enabled"} />
-            <Stat label="Median diameter" info={GLOSSARY.median} value={diams.length ? `${median(diams).toFixed(1)} km` : "—"} />
-            <Stat label="Density" info={GLOSSARY.density} value={`${((scope.all.length / scope.areaKm2) * 1e6).toFixed(1)}`} sub="craters per 10⁶ km²" />
-          </div>
+    <section
+      className={`glass absolute right-3 bottom-3 left-3 z-10 h-[220px] rounded-xl transition-all duration-300 ${
+        panels.bottom ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-[120%] opacity-0"
+      }`}
+    >
+      <div className="grid h-full grid-cols-[180px_1fr] gap-6 px-5 py-4">
+        <div className="flex flex-col justify-between border-r border-edge pr-5">
+          <Stat label={scope.scope === "roi" ? "In region" : "Craters"} value={scope.all.length.toLocaleString()} info={GLOSSARY.count} />
+          <Stat label="Median Ø" value={diams.length ? `${median(diams).toFixed(1)} km` : "—"} info={GLOSSARY.median} />
+          <Stat label="Density" value={`${((scope.all.length / scope.areaKm2) * 1e6).toFixed(0)}`} sub="per 10⁶ km²" info={GLOSSARY.density} />
+        </div>
 
-          <div className="flex min-w-0 flex-col">
-            <div className="mb-1 flex items-center gap-3">
-              <h3 className="label">Diameter distribution · √2 bins (km)</h3>
-              <InfoTip text={GLOSSARY.histogram} size={11} />
-              <span className="flex-1" />
-              {active.length > 1 && <Legend ids={active} />}
-              <button onClick={() => setTable(!table)} className="text-regolith-400 hover:text-signal" title="Toggle table view" aria-label="Toggle table view">
-                {table ? <BarChart3 size={13} /> : <Table2 size={13} />}
+        <div className="flex min-w-0 flex-col">
+          <div className="mb-2 flex items-center gap-1">
+            {tabs.map(([id, label, info]) => (
+              <button
+                key={id}
+                onClick={() => setView(id)}
+                title={info}
+                className={`rounded-md px-2.5 py-1 text-[11px] transition ${view === id ? "bg-signal/15 text-signal" : "text-regolith-400 hover:text-regolith-50"}`}
+              >
+                {label}
               </button>
-            </div>
-            {table ? (
-              <div className="scroll-thin num flex-1 overflow-y-auto text-[10.5px]">
+            ))}
+            <span className="flex-1" />
+            {active.length > 1 && <Legend ids={active} />}
+          </div>
+          <div className="min-h-0 flex-1">
+            {view === "table" && (
+              <div className="scroll-thin num h-full overflow-y-auto text-[10.5px]">
                 <table className="w-full">
                   <thead className="text-regolith-400">
-                    <tr><th className="text-left font-normal">bin (km)</th>{active.map((id) => <th key={id} className="text-right font-normal">{CATALOG_STYLE[id].short}</th>)}</tr>
+                    <tr><th className="text-left font-normal">Ø bin (km)</th>{active.map((id) => <th key={id} className="text-right font-normal">{CATALOG_STYLE[id].short}</th>)}</tr>
                   </thead>
                   <tbody>
                     {trimmed.map((b) => (
@@ -117,7 +127,8 @@ export function BottomPanel() {
                   </tbody>
                 </table>
               </div>
-            ) : (
+            )}
+            {view === "hist" && (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={trimmed} barCategoryGap={2} margin={{ top: 4, right: 4, bottom: 0, left: -12 }}>
                   <CartesianGrid vertical={false} stroke="#ffffff" strokeOpacity={0.05} />
@@ -130,57 +141,22 @@ export function BottomPanel() {
                 </BarChart>
               </ResponsiveContainer>
             )}
-          </div>
-
-          <div className="flex min-w-0 flex-col">
-            <div className="mb-1 flex items-center gap-3">
-              <h3 className="label">Cumulative SFD · N(≥D) per km²</h3>
-              <InfoTip text={GLOSSARY.sfd} size={11} />
-              <span className="flex-1" />
-              {active.length > 1 && <Legend ids={active} />}
-            </div>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={sfd} margin={{ top: 4, right: 8, bottom: 0, left: -6 }}>
-                <CartesianGrid stroke="#ffffff" strokeOpacity={0.05} />
-                <XAxis dataKey="d" scale="log" type="number" domain={[5, 320]} ticks={[5, 10, 20, 40, 80, 160, 320]} {...AXIS} tickLine={false} />
-                <YAxis scale="log" type="number" domain={["auto", "auto"]} allowDataOverflow {...AXIS} tickLine={false} axisLine={false} width={50} tickFormatter={(v: number) => v.toExponential(0)} />
-                <Tooltip content={<ChartTooltip unit="km" />} />
-                {active.map((id) => (
-                  <Line key={id} dataKey={id} stroke={CATALOG_STYLE[id].color} strokeWidth={2} dot={{ r: 2.5, strokeWidth: 0, fill: CATALOG_STYLE[id].color }} connectNulls={false} isAnimationActive={false} />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="flex flex-col border-l border-edge pl-5">
-            <div className="flex items-center gap-2">
-              <h3 className="label">Inference results</h3>
-              <InfoTip text={GLOSSARY.inference} size={11} />
-              <span className="flex-1" />
-              <Badge kind="pending" />
-            </div>
-            <div className="mt-2 space-y-1.5 text-[11px]">
-              {["Precision", "Recall", "F1-score", "Location error", "Diameter error", "Inference time"].map((m) => (
-                <div key={m} className="flex justify-between">
-                  <span className="text-regolith-400">{m}</span>
-                  <span className="num text-regolith-600">—</span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-auto text-[10px] leading-snug text-regolith-600">
-              Populated from evaluated experiments (Phase 4). Target baseline: DeepMoon — recall 92%, median fractional errors ≤ 11%.
-            </p>
+            {view === "sfd" && (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sfd} margin={{ top: 4, right: 8, bottom: 0, left: -6 }}>
+                  <CartesianGrid stroke="#ffffff" strokeOpacity={0.05} />
+                  <XAxis dataKey="d" scale="log" type="number" domain={[5, 320]} ticks={[5, 10, 20, 40, 80, 160, 320]} {...AXIS} tickLine={false} />
+                  <YAxis scale="log" type="number" domain={["auto", "auto"]} allowDataOverflow {...AXIS} tickLine={false} axisLine={false} width={50} tickFormatter={(v: number) => v.toExponential(0)} />
+                  <Tooltip content={<ChartTooltip unit="km" />} />
+                  {active.map((id) => (
+                    <Line key={id} dataKey={id} stroke={CATALOG_STYLE[id].color} strokeWidth={2} dot={{ r: 2.5, strokeWidth: 0, fill: CATALOG_STYLE[id].color }} connectNulls={false} isAnimationActive={false} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
-      </section>
-      <button
-        onClick={() => togglePanel("bottom")}
-        className="glass absolute left-1/2 z-10 -translate-x-1/2 rounded-t-md px-4 text-regolith-400 transition-all hover:text-signal"
-        style={{ bottom: panels.bottom ? 224 : 0 }}
-        aria-label="Toggle metrics panel"
-      >
-        {panels.bottom ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-      </button>
-    </>
+      </div>
+    </section>
   );
 }

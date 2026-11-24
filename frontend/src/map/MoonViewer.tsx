@@ -24,6 +24,7 @@ import {
   UrlTemplateImageryProvider,
   Viewer,
   VerticalOrigin,
+  HorizontalOrigin,
   DistanceDisplayCondition,
   Entity,
   CallbackProperty,
@@ -168,9 +169,13 @@ export function MoonViewer() {
     return () => {
       handler.destroy();
       viewer.destroy();
+      // reset every handle so a remount (StrictMode / hot reload) never touches a destroyed scene
       viewerRef.current = null;
       layersRef.current = {};
       rimsRef.current = {};
+      labelsRef.current = null;
+      selectionRef.current = null;
+      roiEntityRef.current = null;
     };
   }, []);
 
@@ -200,9 +205,11 @@ export function MoonViewer() {
 
   // ---- imagery layers -----------------------------------------------------
   useEffect(() => {
-    for (const [id, st] of Object.entries(rasters)) {
-      const layer = layersRef.current[id];
-      if (!layer) continue;
+    // each UI layer drives every raster product assigned to it (global + high-res)
+    for (const def of RASTER_LAYERS) {
+      const layer = layersRef.current[def.id];
+      const st = rasters[def.ui];
+      if (!layer || !st) continue;
       layer.show = st.visible;
       layer.alpha = st.opacity;
     }
@@ -220,7 +227,7 @@ export function MoonViewer() {
       coll.removeAll();
       if (!catalogs[id] || !data) continue;
       const material = Material.fromType("Color", {
-        color: Color.fromCssColorString(CATALOG_STYLE[id].mapColor).withAlpha(0.85),
+        color: Color.fromCssColorString(CATALOG_STYLE[id].mapColor).withAlpha(0.6),
       });
       for (const c of data) {
         if (c.diameter_km < dmin || c.diameter_km > dmax) continue;
@@ -231,7 +238,9 @@ export function MoonViewer() {
         const ring = craterRim(c.lon, c.lat, c.diameter_km, segs);
         const heights: number[] = [];
         for (let i = 0; i < ring.length; i += 2) heights.push(ring[i], ring[i + 1], h);
-        coll.add({ positions: Cartesian3.fromDegreesArrayHeights(heights, MOON), width: 1.25, material });
+        // level of detail: a crater's rim appears once the camera is within ~120× its diameter
+        const ddc = new DistanceDisplayCondition(0, Math.max(800_000, c.diameter_km * 120_000));
+        coll.add({ positions: Cartesian3.fromDegreesArrayHeights(heights, MOON), width: 1, material, distanceDisplayCondition: ddc });
       }
     }
     pickRef.current.craters = visible;
@@ -248,11 +257,12 @@ export function MoonViewer() {
     if (showNames && names.data) {
       for (const f of names.data.features) {
         // zoom-dependent label density: large features from afar, smaller craters only up close
-        const major = ["ME", "OC", "MA"].includes(f.type) || f.diameter_km >= 180;
-        const medium = !major && (["SI", "LC"].includes(f.type) || (f.type === "AA" && f.diameter_km >= 50));
+        // whole-Moon view: maria only; zooming in progressively reveals large then small craters
+        const major = ["ME", "OC"].includes(f.type);
+        const medium = !major && (["SI", "LC", "MA"].includes(f.type) || (f.type === "AA" && f.diameter_km >= 60));
         const minor = !major && !medium && f.type === "AA" && f.diameter_km >= 15;
         if (!major && !medium && !minor) continue;
-        const far = major ? 14_000_000 : medium ? 2_500_000 : 700_000;
+        const far = major ? 14_000_000 : medium ? 2_200_000 : 600_000;
         labels.add({
           position: Cartesian3.fromDegrees(f.lon, f.lat, 3000, MOON),
           text: f.name,
@@ -262,6 +272,7 @@ export function MoonViewer() {
           outlineWidth: 3,
           style: LabelStyle.FILL_AND_OUTLINE,
           verticalOrigin: VerticalOrigin.CENTER,
+          horizontalOrigin: HorizontalOrigin.CENTER,
           distanceDisplayCondition: new DistanceDisplayCondition(0, far),
           translucencyByDistance: new NearFarScalar(far * 0.4, 1, far, 0.2),
         });
@@ -291,7 +302,7 @@ export function MoonViewer() {
   // ---- ROI rectangle ------------------------------------------------------
   useEffect(() => {
     const viewer = viewerRef.current;
-    if (!viewer) return;
+    if (!viewer || viewer.isDestroyed()) return;
     if (!roiEntityRef.current) {
       roiEntityRef.current = viewer.entities.add({
         rectangle: {

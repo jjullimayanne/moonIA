@@ -1,12 +1,10 @@
 import { useMemo, useState } from "react";
-import { Box, Map, Search, Cpu, Server, Clock } from "lucide-react";
-import { useMoon } from "../store";
+import { Box, Map, Search } from "lucide-react";
+import { useMoon, PAGES, type Page } from "../store";
 import { API_ENABLED, useHealth } from "../api/backend";
 import { useCatalog, useNomenclature } from "../data/catalogs";
 import { formatUpdate, useManifest } from "../data/manifest";
 import { parseCoordinates } from "../lib/lunar";
-import { InfoTip } from "./InfoTip";
-import { GLOSSARY } from "../data/glossary";
 
 function Logo() {
   return (
@@ -33,43 +31,52 @@ function Logo() {
   );
 }
 
-function Status({ ok, label, detail, icon: Icon }: { ok: boolean | null; label: string; detail: string; icon: typeof Cpu }) {
-  const color = ok === null ? "bg-regolith-600" : ok ? "bg-ok" : "bg-warn";
-  return (
-    <div className="flex items-center gap-2 rounded-md px-2 py-1 text-[11px]" title={detail}>
-      <Icon size={13} className="text-regolith-400" />
-      <span className="text-regolith-200">{label}</span>
-      <span className={`h-1.5 w-1.5 rounded-full ${color} ${ok ? "shadow-[0_0_8px_#4ade80]" : ""}`} />
-    </div>
-  );
-}
-
-/** "Last update" chip: model publish time when a model exists, otherwise the catalog build time. */
-function LastUpdate() {
+/** One compact status pill: API reachability, model state and last update (details on hover). */
+function StatusPill() {
+  const health = useHealth();
   const manifest = useManifest();
   const head = useCatalog("head2010");
   const m = manifest.data;
+  const apiOk = API_ENABLED && health.isSuccess;
   const when = m ? m.published_at : head.data?.meta.generated_at;
-  const what = m ? `Model ${m.version}` : "Data";
-  const detail = m
-    ? `Active model ${m.version} (experiment ${m.experiment_id}), trained ${formatUpdate(m.trained_at)}, published ${formatUpdate(m.published_at)}. Models are refreshed at most once a day.`
-    : "No AI model published yet. Showing when the crater catalogs were last built. Models are refreshed at most once a day.";
+  const detail = [
+    API_ENABLED ? (apiOk ? "API online — terrain queries enabled." : "API offline — map and catalogs still work.") : "Static mode — no API.",
+    m ? `Active model ${m.version}, trained ${formatUpdate(m.trained_at)}.` : "No AI model published yet.",
+    `Last update ${formatUpdate(when)}${m ? " (model)" : " (catalog data)"}. Models refresh at most once a day.`,
+  ].join(" ");
   return (
-    <div className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px]" title={detail}>
-      <Clock size={13} className="text-regolith-400" />
-      <span className="text-regolith-400">{what} · updated</span>
+    <div className="flex items-center gap-2 rounded-full border border-edge px-3 py-1 text-[11px]" title={detail}>
+      <span className={`h-1.5 w-1.5 rounded-full ${apiOk ? "bg-ok shadow-[0_0_8px_#4ade80]" : "bg-regolith-600"}`} />
+      <span className="text-regolith-400">{m ? `Model ${m.version}` : "Updated"}</span>
       <span className="num text-regolith-200">{formatUpdate(when)}</span>
     </div>
   );
 }
 
-export function Header() {
-  const { viewMode, set, requestFlyTo } = useMoon();
-  const health = useHealth();
+function Nav() {
+  const { page, setPage } = useMoon();
+  return (
+    <nav className="flex items-center gap-0.5">
+      {PAGES.map((p) => (
+        <button
+          key={p.id}
+          onClick={() => setPage(p.id as Page)}
+          className={`rounded-md px-2.5 py-1 text-[12px] transition ${
+            page === p.id ? "bg-white/8 text-regolith-50" : "text-regolith-400 hover:text-regolith-50"
+          }`}
+        >
+          {p.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function SearchBox() {
+  const { set, requestFlyTo } = useMoon();
   const names = useNomenclature();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
-
   const coords = parseCoordinates(q);
   const matches = useMemo(() => {
     if (!names.data || q.trim().length < 2 || coords) return [];
@@ -86,94 +93,83 @@ export function Header() {
     setOpen(false);
   };
 
-  const backendOk = health.isSuccess ? true : health.isError ? false : null;
-  const model = health.data?.model.status;
+  return (
+    <div className="relative w-full max-w-sm">
+      <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-regolith-400" />
+      <input
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(true);
+        }}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            if (coords) go(coords.lon, coords.lat);
+            else if (matches[0]) go(matches[0].lon, matches[0].lat, matches[0].diameter_km);
+          }
+        }}
+        placeholder="Search a crater or lat, lon"
+        title="Feature name (Copernicus, Tycho, Mare Imbrium) or coordinates such as 9.62, -20.08 or 9.62N 20.08W"
+        className="w-full rounded-lg border border-edge bg-black/30 py-1.5 pr-3 pl-8 text-[12px] placeholder:text-regolith-600 focus:border-signal/50 focus:outline-none"
+      />
+      {open && (matches.length > 0 || coords) && (
+        <div className="glass animate-in absolute top-full mt-1.5 w-full overflow-hidden rounded-lg py-1 text-[12px]">
+          {coords && (
+            <button onMouseDown={() => go(coords.lon, coords.lat)} className="flex w-full justify-between px-3 py-1.5 hover:bg-signal/10">
+              <span>Go to coordinates</span>
+              <span className="num text-regolith-400">{coords.lat.toFixed(3)}, {coords.lon.toFixed(3)}</span>
+            </button>
+          )}
+          {matches.map((f) => (
+            <button
+              key={`${f.name}${f.lon}`}
+              onMouseDown={() => go(f.lon, f.lat, f.diameter_km)}
+              className="flex w-full justify-between px-3 py-1.5 text-left hover:bg-signal/10"
+            >
+              <span>{f.name}</span>
+              <span className="num text-regolith-400">{f.diameter_km.toFixed(0)} km</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
+export function Header() {
+  const { viewMode, set, page } = useMoon();
   return (
     <header className="glass absolute top-3 right-3 left-3 z-20 flex h-12 items-center gap-4 rounded-xl px-4">
       <Logo />
-      <div className="mx-2 h-6 w-px bg-edge" />
-
-      <div className="flex rounded-lg border border-edge p-0.5 text-[11px]">
-        {(["3d", "2d"] as const).map((m) => (
-          <button
-            key={m}
-            onClick={() => set({ viewMode: m })}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 transition ${
-              viewMode === m ? "bg-signal/15 text-signal" : "text-regolith-400 hover:text-regolith-50"
-            }`}
-          >
-            {m === "3d" ? <Box size={13} /> : <Map size={13} />}
-            {m.toUpperCase()}
-          </button>
-        ))}
-      </div>
-      <InfoTip text={GLOSSARY.mode} />
-
-      <div className="relative max-w-md flex-1">
-        <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-regolith-400" />
-        <input
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setOpen(true);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              if (coords) go(coords.lon, coords.lat);
-              else if (matches[0]) go(matches[0].lon, matches[0].lat, matches[0].diameter_km);
-            }
-          }}
-          placeholder="Crater name (Copernicus) or lat, lon (9.62, -20.08)"
-          className="w-full rounded-lg border border-edge bg-black/30 py-1.5 pr-3 pl-8 text-[12px] placeholder:text-regolith-600 focus:border-signal/50 focus:outline-none"
-        />
-        {open && (matches.length > 0 || coords) && (
-          <div className="glass animate-in absolute top-full mt-1.5 w-full overflow-hidden rounded-lg py-1 text-[12px]">
-            {coords && (
-              <button onClick={() => go(coords.lon, coords.lat)} className="flex w-full justify-between px-3 py-1.5 hover:bg-signal/10">
-                <span>Go to coordinates</span>
-                <span className="num text-regolith-400">
-                  {coords.lat.toFixed(3)}, {coords.lon.toFixed(3)}
-                </span>
-              </button>
-            )}
-            {matches.map((f) => (
+      <div className="h-6 w-px bg-edge" />
+      <Nav />
+      {page === "explorer" && (
+        <>
+          <div className="ml-2 flex rounded-lg border border-edge p-0.5 text-[11px]">
+            {(["3d", "2d"] as const).map((m) => (
               <button
-                key={`${f.name}${f.lon}`}
-                onClick={() => go(f.lon, f.lat, f.diameter_km)}
-                className="flex w-full justify-between px-3 py-1.5 text-left hover:bg-signal/10"
+                key={m}
+                onClick={() => set({ viewMode: m })}
+                className={`flex items-center gap-1.5 rounded-md px-2 py-1 transition ${
+                  viewMode === m ? "bg-signal/15 text-signal" : "text-regolith-400 hover:text-regolith-50"
+                }`}
               >
-                <span>{f.name}</span>
-                <span className="num text-regolith-400">{f.diameter_km.toFixed(0)} km</span>
+                {m === "3d" ? <Box size={12} /> : <Map size={12} />}
+                {m.toUpperCase()}
               </button>
             ))}
           </div>
-        )}
-      </div>
-
-      <div className="ml-auto flex items-center gap-1">
-        <InfoTip text={GLOSSARY.search} />
-        <span className="w-3" />
-        <Status
-          icon={Server}
-          ok={backendOk}
-          label={!API_ENABLED ? "Static mode" : backendOk ? "API online" : backendOk === false ? "API offline" : "API…"}
-          detail={backendOk ? "FastAPI backend reachable — DEM queries enabled" : "Static mode: catalogs and imagery work; DEM queries need the backend"}
-        />
-        <Status
-          icon={Cpu}
-          ok={model === "ready" ? true : backendOk ? false : null}
-          label={model === "ready" ? "Model ready" : "Model: not trained"}
-          detail="U-Net crater detector is under development (Phase 4). No predictions are shown until a model is trained and evaluated."
-        />
-        <InfoTip text={`${GLOSSARY.api} ${GLOSSARY.model}`} />
-        <div className="mx-1 h-5 w-px bg-edge" />
-        <LastUpdate />
+          <SearchBox />
+        </>
+      )}
+      <div className="ml-auto flex items-center gap-2">
+        <StatusPill />
         <a
           href="https://github.com/jjullimayanne/moonIA"
           target="_blank"
           rel="noreferrer"
-          className="ml-1 rounded-md p-1.5 text-regolith-400 hover:text-regolith-50"
+          className="rounded-md p-1.5 text-regolith-400 hover:text-regolith-50"
           aria-label="GitHub repository"
         >
           <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden>

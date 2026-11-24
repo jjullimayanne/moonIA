@@ -1,11 +1,11 @@
-import { ChevronLeft, ChevronRight, Crosshair, CircleDot, ScanSearch, Download, Mountain, Info, X } from "lucide-react";
+import { Crosshair, CircleDot, ScanSearch, Download, Mountain, X } from "lucide-react";
 import { useMoon } from "../store";
 import { useHealth, useTerrain } from "../api/backend";
 import { CATALOG_STYLE } from "../data/catalogs";
 import { useScopeCraters } from "../data/scope";
-import { formatLat, formatLon, CRS_LABEL } from "../lib/lunar";
+import { formatLat, formatLon } from "../lib/lunar";
 import { cratersToCSV, cratersToGeoJSON, download } from "../lib/export";
-import { Badge, Row, Section } from "./Panel";
+import { Row, Section } from "./Panel";
 import { GLOSSARY } from "../data/glossary";
 
 function TerrainBlock() {
@@ -82,75 +82,54 @@ function RoiBlock() {
 }
 
 export function RightPanel() {
-  const { panels, togglePanel, selectedPoint, selectedCrater, selectedFeature, drawingRoi, set } = useMoon();
+  const { selectedPoint, selectedCrater, selectedFeature, roi, set } = useMoon();
+  const open = !!(selectedPoint || roi);
+  const close = () => set({ selectedPoint: null, selectedCrater: null, selectedFeature: null });
   return (
-    <>
-      <aside
-        className={`glass scroll-thin absolute top-[68px] right-3 z-10 w-72 overflow-y-auto rounded-xl transition-all duration-300 ${
-          panels.right ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-[110%] opacity-0"
-        }`}
-        style={{ bottom: panels.bottom ? 236 : 12 }}
-      >
-        <Section title="Location" icon={Crosshair} info={GLOSSARY.location}>
-          {selectedPoint ? (
-            <>
-              <Row k="Latitude" v={formatLat(selectedPoint.lat, 4)} />
-              <Row k="Longitude" v={formatLon(selectedPoint.lon, 4)} />
-              {selectedFeature && <Row k="IAU feature" v={selectedFeature.name} mono={false} />}
-            </>
-          ) : (
-            <p className="text-[11.5px] text-regolith-400">Click anywhere on the Moon to inspect a location.</p>
-          )}
-          <div className="mt-2 text-[9.5px] text-regolith-600">{CRS_LABEL} · planetocentric, east-positive</div>
-        </Section>
-
-        {selectedPoint && (
-          <Section title="Terrain" icon={Mountain} aside={<Badge kind="real" />} info={GLOSSARY.terrain}>
-            <TerrainBlock />
-          </Section>
-        )}
-
-        <Section title="Crater" icon={CircleDot} info={GLOSSARY.crater}>
-          {selectedCrater ? (
-            <div className="animate-in">
-              <div className="mb-1 flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full" style={{ background: CATALOG_STYLE[selectedCrater.catalog].mapColor }} />
-                <span className="text-[12px]">{CATALOG_STYLE[selectedCrater.catalog].short}</span>
-                <Badge kind="real" />
+    <aside
+      className={`glass scroll-thin absolute top-[68px] right-3 z-10 max-h-[calc(100%-140px)] w-72 overflow-y-auto rounded-xl transition-all duration-300 ${
+        open ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-[110%] opacity-0"
+      }`}
+    >
+      {selectedPoint && (
+        <Section
+          title={selectedCrater ? "Crater" : "Location"}
+          icon={selectedCrater ? CircleDot : Crosshair}
+          info={selectedCrater ? GLOSSARY.crater : GLOSSARY.location}
+          aside={
+            <button onClick={close} className="text-regolith-400 hover:text-regolith-50" aria-label="Close inspector">
+              <X size={13} />
+            </button>
+          }
+        >
+          <div className="animate-in">
+            {(selectedFeature || selectedCrater) && (
+              <div className="mb-2 flex items-center gap-2">
+                {selectedCrater && (
+                  <span className="h-2.5 w-2.5 rounded-full border-2" style={{ borderColor: CATALOG_STYLE[selectedCrater.catalog].mapColor }} />
+                )}
+                <span className="text-[15px] font-medium">{selectedFeature?.name ?? "Unnamed crater"}</span>
               </div>
-              <Row k="Diameter" v={`${selectedCrater.diameter_km.toFixed(2)} km`} />
-              <Row k="Center" v={`${formatLat(selectedCrater.lat, 3)}, ${formatLon(selectedCrater.lon, 3)}`} />
-              <Row k="Prediction confidence" v={<span className="text-regolith-600">— no model yet</span>} />
-              <Row k="Source" v={<span className="text-[11px]">Catalog (human-mapped)</span>} mono={false} />
-            </div>
-          ) : (
-            <p className="text-[11.5px] text-regolith-400">
-              {selectedPoint ? "No catalogued crater contains this point (within active filters)." : "Select a crater rim on the map."}
-            </p>
-          )}
+            )}
+            {selectedCrater && (
+              <>
+                <Row k="Diameter" v={`${selectedCrater.diameter_km.toFixed(1)} km`} />
+                <Row k="Catalog" v={CATALOG_STYLE[selectedCrater.catalog].short} mono={false} />
+              </>
+            )}
+            <Row k="Latitude" v={formatLat(selectedPoint.lat, 4)} />
+            <Row k="Longitude" v={formatLon(selectedPoint.lon, 4)} />
+          </div>
         </Section>
+      )}
 
-        <RoiBlock />
-
-        <Section title="Analysis" icon={Info} info={GLOSSARY.analysis}>
-          <button
-            onClick={() => set({ drawingRoi: !drawingRoi })}
-            className={`w-full rounded-md border py-1.5 text-[11.5px] transition ${
-              drawingRoi ? "border-signal bg-signal/15 text-signal" : "border-edge text-regolith-200 hover:border-signal/50"
-            }`}
-          >
-            {drawingRoi ? "Drag on the map to draw…" : "Select a region (rectangle)"}
-          </button>
+      {selectedPoint && (
+        <Section title="Terrain" icon={Mountain} info={GLOSSARY.terrain}>
+          <TerrainBlock />
         </Section>
-      </aside>
-      <button
-        onClick={() => togglePanel("right")}
-        className="glass absolute top-1/2 z-10 -translate-y-1/2 rounded-l-md py-3 text-regolith-400 transition-all hover:text-signal"
-        style={{ right: panels.right ? 300 : 0 }}
-        aria-label="Toggle inspector panel"
-      >
-        {panels.right ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-      </button>
-    </>
+      )}
+
+      <RoiBlock />
+    </aside>
   );
 }

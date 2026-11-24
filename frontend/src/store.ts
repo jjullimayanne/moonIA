@@ -4,12 +4,28 @@ import type { BBox } from "./lib/lunar";
 
 export type ViewMode = "3d" | "2d";
 
+/** Top-level modules. Explorer is the map; the others are full-screen lab views. */
+export const PAGES = [
+  { id: "explorer", label: "Explorer" },
+  { id: "training", label: "Training Studio" },
+  { id: "pipeline", label: "Pipeline" },
+  { id: "registry", label: "Experiments" },
+] as const;
+export type Page = (typeof PAGES)[number]["id"];
+
+const pageFromHash = (): Page => {
+  const h = typeof location !== "undefined" ? location.hash.replace("#/", "") : "";
+  return (PAGES.find((p) => p.id === h)?.id ?? "explorer") as Page;
+};
+
 interface LayerState {
   visible: boolean;
   opacity: number;
 }
 
 interface MoonState {
+  page: Page;
+  setPage: (p: Page) => void;
   viewMode: ViewMode;
   rasters: Record<string, LayerState>;
   catalogs: Record<CatalogId, boolean>;
@@ -32,14 +48,17 @@ interface MoonState {
 }
 
 export const useMoon = create<MoonState>((set) => ({
+  page: pageFromHash(),
+  setPage: (page) => {
+    history.replaceState(null, "", page === "explorer" ? location.pathname : `#/${page}`);
+    set({ page });
+  },
   viewMode: "3d",
   rasters: {
-    wac: { visible: true, opacity: 1 },
-    "lola-clrshade": { visible: false, opacity: 0.7 },
-    "lolakaguya-clrhillshade": { visible: false, opacity: 0.75 },
-    "lolakaguya-hillshade": { visible: false, opacity: 0.6 },
-    "lolakaguya-slope": { visible: false, opacity: 0.75 },
-    "lola-slope-global": { visible: false, opacity: 0.75 },
+    imagery: { visible: true, opacity: 1 },
+    elevation: { visible: false, opacity: 0.7 },
+    slope: { visible: false, opacity: 0.7 },
+    shading: { visible: false, opacity: 0.5 },
   },
   catalogs: { head2010: true, povilaitis2018: false },
   showNames: true,
@@ -51,7 +70,7 @@ export const useMoon = create<MoonState>((set) => ({
   roi: null,
   drawingRoi: false,
   flyTo: null,
-  panels: { left: true, right: true, bottom: true },
+  panels: { left: true, right: true, bottom: false },
 
   set: (p) => set(p),
   setRaster: (id, p) => set((s) => ({ rasters: { ...s.rasters, [id]: { ...s.rasters[id], ...p } } })),
