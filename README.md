@@ -73,6 +73,42 @@ flowchart TD
     L --> M["Explorer · Training Studio<br/>AI Playground update<br/>without redeploying the frontend"]
 ```
 
+
+### How the model operates, in plain words
+
+1. **Input: elevation, not photographs.** The network sees 256 × 256 grayscale tiles of the LOLA + Kaguya digital elevation model, where each pixel is terrain *height*. A photograph changes with the Sun angle, because shadows flip side. Height does not, so a crater is always a depression with a raised rim.
+2. **Supervision: rings drawn from the catalogs.** Each training tile comes with a mask of the crater rims of the Head 2010 and Povilaitis 2018 catalogs. Both come from the DeepMoon dataset. The U-Net learns to draw those rings itself, outputting a rim probability for every pixel.
+3. **From pixels to craters.** The probability map is thresholded at 0.1, and circles of radius 5–40 px are fitted by template matching. Each circle is converted to lunar longitude, latitude and diameter in km, and duplicates from overlapping tiles are merged.
+4. **Runs once per model, not per visitor.** After an approved training run, the pipeline runs the model over the validation and test tiles and writes the craters to `moonai/predictions/vN/craters.geojson`. The map only reads that file. The one exception is the **AI Playground**, which runs the 3 MB `model.onnx` *inside the visitor's browser*, with no server involved.
+
+### Where everything on the site comes from
+
+| On screen | Source | Served by |
+|---|---|---|
+| Moon surface (imagery, elevation, slope) | NASA Moon Trek WMTS tiles | NASA servers, streamed directly by the browser |
+| Blue / orange crater rims (Head 2010, Povilaitis 2018) | Real catalogs, normalized once by `backend/app/ingestion` | Static JSON in `frontend/public/data/catalogs/` |
+| Crater names | IAU Gazetteer of Planetary Nomenclature (USGS) | Static JSON |
+| Violet dashed rims and dots (AI detections) | Output of the trained model | Static GeoJSON in `frontend/public/moonai/predictions/` |
+| Training Studio, Experiments, AI Discoveries | Pipeline artifacts (history, metrics, sample predictions) | Static JSON and PNG in `frontend/public/moonai/` |
+| Elevation and slope of a clicked point | USGS LOLA + Kaguya DEM (22.6 GB), read by range requests | **FastAPI backend**: local only today, so this panel is hidden on the public site |
+
+The public site needs **no API and no server**. It is a static build on GitHub Pages, so it costs nothing.
+
+### AWS: what is ready, and what turning it on adds
+
+Everything is written in Terraform (`infrastructure/terraform/`) and validated: `terraform plan` shows 37 resources. **Nothing has been applied, and there is no AWS cost today.**
+
+| Component | What it does | Why turn it on |
+|---|---|---|
+| **Lambda (arm64) + API Gateway HTTP API** | Runs the same FastAPI backend through Mangum. Throttled at 5 req/s (burst 10). | Makes click-to-measure **elevation and slope** work on the public site. This is the main gain. |
+| **S3 (3 buckets) + CloudFront (OAC)** | Private buckets for the site, the model artifacts (`models/vN`, `latest.json`) and logs, behind a CDN with `/moonai/*` and `/api/*` routes. | One domain for the site and the API, plus publishing new models with `make pipeline PUBLISH=true` without a git commit. |
+| **AWS Budgets + CloudWatch alarm** | E-mail alerts at US$ 1 / 3 / 5, and an alarm if storage exceeds 20 GB. | Cost safety: an alert, not a hard stop. |
+| **GitHub OIDC role** | Lets the manual `deploy-aws.yml` workflow deploy without storing AWS keys. | Secure one-click deploys. |
+
+Estimated cost (validated AWS prices, free tier ignored): **≈ US$ 0.37/month** for bootcamp-demo traffic and **≈ US$ 3.26/month** for an active project. With the always-free tier it is ≈ US$ 0. See [the cost estimate](docs/architecture/02-aws-cost-estimate.md).
+
+Turning it on requires an explicit go-ahead, an e-mail address for the budget alerts, then `terraform apply` and the manual deploy workflow. There is no EC2, RDS, NAT or GPU, and training never runs on AWS.
+
 ---
 
 ## What it does today
@@ -139,7 +175,7 @@ cd frontend && npm test && npm run typecheck
 
 ## Deep-learning pipeline (local training)
 
-All training and inference run **on your own machine** (Apple Silicon MPS, NVIDIA CUDA or CPU, detected automatically). AWS only ever stores published, approved artifacts.
+Training runs **on your own machine** (Apple Silicon MPS, NVIDIA CUDA or CPU, detected automatically) or **on a free Colab GPU** (below), never on AWS. AWS, once enabled, only stores published, approved artifacts.
 
 ```bash
 make pipeline PROFILE=development      # download → preprocess → train → evaluate → ONNX → gate → publish to the local site
