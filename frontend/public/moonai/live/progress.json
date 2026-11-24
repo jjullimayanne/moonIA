@@ -3,11 +3,11 @@
   "status": "running",
   "epoch": 1,
   "total_epochs": 4,
-  "step": 1100,
+  "step": 1160,
   "total_steps": 3750,
   "metrics": {
-    "train_loss": 0.12811247057874095
+    "train_loss": 0.12654399989365503
   },
-  "updated_at": "2026-11-24T20:06:40Z",
+  "updated_at": "2026-11-24T20:07:15Z",
   "sync_interval_s": 600
 }
