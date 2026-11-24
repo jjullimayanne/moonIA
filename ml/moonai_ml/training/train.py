@@ -10,6 +10,7 @@ ReduceLROnPlateau, automatic batch-size halving on out-of-memory.
 from __future__ import annotations
 
 import copy
+import math
 import random
 import time
 from pathlib import Path
@@ -52,6 +53,21 @@ def _rims_png(mask: np.ndarray, path: Path) -> None:
     Image.fromarray(rgb).save(path, optimize=True)
 
 
+def logit_offset(cfg: Config) -> float:
+    """pos_weight w multiplies the odds the network learns by w (p/(1-p) -> w·p/(1-p)).
+    Subtracting log(w) from the logits restores calibrated probabilities, so the 0.1 rim
+    threshold and the ring matcher (tuned on unweighted BCE, as in DeepMoon) keep their meaning."""
+    return math.log(cfg.train.pos_weight)
+
+
+def calibrated_state(model, cfg: Config) -> dict:
+    """State dict with the head bias shifted by -log(w): export, prediction and the browser
+    all see calibrated probabilities without knowing about pos_weight."""
+    sd = {k: v.detach().clone() for k, v in model.state_dict().items()}
+    sd["head.bias"] -= logit_offset(cfg)
+    return sd
+
+
 @torch.no_grad()
 def evaluate(model, loader, device, crater_gt, cfg: Config, n_crater_tiles: int):
     model.eval()
@@ -59,7 +75,7 @@ def evaluate(model, loader, device, crater_gt, cfg: Config, n_crater_tiles: int)
     loss_sum, n_px, ious, probs = 0.0, 0, [], []
     for x, y in loader:
         x, y = x.to(device), y.to(device)
-        logits = model(x)
+        logits = model(x) - logit_offset(cfg)
         loss_sum += bce(logits, y).item()
         n_px += y.numel()
         p = torch.sigmoid(logits).cpu().numpy()[:, 0]
@@ -190,7 +206,7 @@ def train(cfg: Config, run: Run, train_h5: Path, val_h5: Path, crater_gt, mlflow
         model.eval()
         with torch.no_grad():
             xs = torch.stack([val_ds[i][0] for i in fixed]).to(device)
-            probs = torch.sigmoid(model(xs)).cpu().numpy()[:, 0]
+            probs = torch.sigmoid(model(xs) - logit_offset(cfg)).cpu().numpy()[:, 0]
         for i, p in zip(fixed, probs):
             _png(p, samples_dir / f"epoch_{epoch:03d}" / f"val_{i:03d}_pred.png", cmap="inferno")
         if epoch in cfg.train.activation_epochs or epoch == cfg.train.epochs:
@@ -212,7 +228,7 @@ def train(cfg: Config, run: Run, train_h5: Path, val_h5: Path, crater_gt, mlflow
         ckpt.parent.mkdir(parents=True, exist_ok=True)
         torch.save(state, ckpt)
         if improved:
-            torch.save({"model": model.state_dict(), "epoch": epoch, "cfg": cfg.model.model_dump()}, ckpt.parent / "best.pt")
+            torch.save({"model": calibrated_state(model, cfg), "epoch": epoch, "cfg": cfg.model.model_dump()}, ckpt.parent / "best.pt")
         run.write_json("training_history.json", {"epochs": history})
         write_samples_index()
         if on_epoch:
