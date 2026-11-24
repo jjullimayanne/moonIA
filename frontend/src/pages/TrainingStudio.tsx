@@ -17,14 +17,15 @@ const AXIS = { stroke: "#4b5562", tick: { fill: "#8b96a3", fontSize: 10, fontFam
 // validated categorical pair (dark surface) reused from the catalog palette
 const C_TRAIN = "#139fc0";
 const C_VAL = "#d0782f";
-const STALE_MS = 15 * 60_000;
 
 function LiveBanner() {
   const live = useLiveProgress();
   const p = live.data;
   if (!p) return null;
   const age = Date.now() - new Date(p.updated_at).getTime();
-  const stale = p.status === "running" && age > STALE_MS;
+  // no update for 2.5× the expected sync interval (+5 min deploy margin) → machine off or job stopped
+  const expected = (p.sync_interval_s ?? 600) * 1000;
+  const stale = p.status === "running" && age > Math.max(15 * 60_000, 2.5 * expected + 5 * 60_000);
   const pct = p.total_steps ? Math.round((100 * p.step) / p.total_steps) : 0;
   return (
     <Card className="mb-5">
@@ -57,9 +58,10 @@ export default function TrainingStudio() {
   const exps = index.data?.experiments ?? [];
   const [selected, setSelected] = useState<string>();
   const id = selected ?? exps[0]?.id;
-  const exp = useExperimentFile<Experiment>(id, "experiment.json");
-  const hist = useExperimentFile<{ epochs: EpochRecord[] }>(id, "training_history.json");
-  const samples = useExperimentFile<SampleIndex>(id, "samples/index.json");
+  const running = exps.find((e) => e.id === id)?.status === "running";
+  const exp = useExperimentFile<Experiment>(id, "experiment.json", running);
+  const hist = useExperimentFile<{ epochs: EpochRecord[] }>(id, "training_history.json", running);
+  const samples = useExperimentFile<SampleIndex>(id, "samples/index.json", running);
 
   const epochs = hist.data?.epochs ?? [];
   const [epoch, setEpoch] = useState(1);
@@ -103,6 +105,11 @@ export default function TrainingStudio() {
                 </option>
               ))}
             </select>
+            {running && (
+              <span className="flex items-center gap-1.5 rounded border border-ok/40 px-1.5 py-0.5 text-[10px] text-ok">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-ok" /> LIVE — training now, updates every epoch (~1–2 min delay)
+              </span>
+            )}
             {exp.data?.profile === "smoke" && (
               <span className="rounded border border-warn/40 px-1.5 py-0.5 text-[10px] text-warn">
                 SMOKE RUN — pipeline test on a tiny subset, not a scientific result

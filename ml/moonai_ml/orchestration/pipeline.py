@@ -20,7 +20,7 @@ import torch
 import yaml
 
 from moonai_ml import hardware
-from moonai_ml.config import Config, load_config
+from moonai_ml.config import REPO_ROOT, Config, load_config
 from moonai_ml.evaluation.craters import dedupe_global, extract_craters, match, pixels_to_lonlat_km, recall_by_radius, summarize
 from moonai_ml.export.onnx_export import export, quantize
 from moonai_ml.ingestion import subset, zenodo
@@ -28,6 +28,7 @@ from moonai_ml.log import get_logger, info
 from moonai_ml.models.unet import UNet
 from moonai_ml.preprocessing.dataset import TileDataset, assert_disjoint_longitudes, load_crater_tables
 from moonai_ml.publishing import publish
+from moonai_ml.publishing.live import LiveSync, git_mode_ready
 from moonai_ml.run import Run, git_commit
 
 log = get_logger()
@@ -163,6 +164,11 @@ def stage_predict(cfg: Config, run: Run, splits: list[str]) -> Path:
     return p
 
 
+def model_version_of(site: Path) -> str:
+    p = site / "manifests" / "latest.json"
+    return json.loads(p.read_text())["version"] if p.exists() else "?"
+
+
 def _published_f1(site: Path) -> float | None:
     p = site / "manifests" / "latest.json"
     return json.loads(p.read_text())["metrics"].get("val_f1") if p.exists() else None
@@ -187,8 +193,14 @@ def gate(cfg: Config, val: dict, onnx_info: dict, site: Path) -> tuple[bool, lis
 def run_pipeline(profile: str, sync: str | None, publish_s3: bool, resume: bool, dry_run: bool) -> int:
     cfg = load_config(profile)
     site = _local_site(cfg)
-    sync_dirs = [site] if sync == "local" else []
+    if sync == "git" and not git_mode_ready(REPO_ROOT):
+        raise RuntimeError("--sync git needs GITHUB_TOKEN and a git remote (see notebooks/MoonAI_Colab_Training.ipynb)")
+    sync_dirs = [site] if sync in ("local", "git") else []
     run = (Run.latest_incomplete(cfg, sync_dirs) if resume else None) or Run.create(cfg, sync_dirs)
+    live = LiveSync(run, site, REPO_ROOT, {"id": run.id, "profile": cfg.profile, "created_at": run.state["created_at"]}, git=sync == "git")
+    if sync == "git":
+        run.sync_interval_s = live.min_interval_s
+        run.on_sync = live.on_progress
     get_logger(jsonl=run.dir / "log.jsonl")
     info(log, f"run {run.id} · profile={cfg.profile} · sync={sync or 'off'} · publish_s3={publish_s3}")
     hw = hardware.detect(str(cfg.paths.artifacts.parent))
@@ -231,10 +243,22 @@ def run_pipeline(profile: str, sync: str | None, publish_s3: bool, resume: bool,
         cfg.paths.mlruns.mkdir(parents=True, exist_ok=True)
         mlflow.set_tracking_uri(f"sqlite:///{cfg.paths.mlruns / 'mlflow.db'}")  # local, no server
         mlflow.set_experiment(f"moonai-{cfg.profile}")
+        # preliminary experiment.json so the Training Studio can open the run from epoch 1
+        from moonai_ml.models.unet import describe
+
+        run.write_json("experiment.json", {
+            "id": run.id, "profile": cfg.profile, "created_at": run.state["created_at"], "git_commit": git_commit(), "seed": cfg.seed,
+            "config": cfg.model_dump(mode="json", exclude={"paths"}), "hardware": hw.as_dict(),
+            "architecture": describe(UNet(cfg.model.filters, cfg.model.dropout), cfg.model.filters),
+            "dataset": json.loads((run.dir / "dataset_metadata.json").read_text()), "status": "running",
+        })
+        if sync:
+            live.mirror("running")
+            live.push(f"live: {run.id} started ({cfg.profile}, {hw.device_name})", force=True)
         with mlflow.start_run(run_name=run.id):
             mlflow.log_params({"profile": cfg.profile, "seed": cfg.seed, "filters": cfg.model.filters, "dropout": cfg.model.dropout,
-                               "lr": cfg.train.lr, "epochs": cfg.train.epochs, "n_train": cfg.data.n_train, "n_val": cfg.data.n_val})
-            r = train(cfg, run, Path(paths["train"]), Path(paths["val"]), val_gt, mlflow)
+                               "lr": cfg.train.lr, "epochs": cfg.train.epochs, "pos_weight": cfg.train.pos_weight, "n_train": cfg.data.n_train, "n_val": cfg.data.n_val})
+            r = train(cfg, run, Path(paths["train"]), Path(paths["val"]), val_gt, mlflow, on_epoch=live.on_epoch if sync else None)
         run.write_json("architecture.json", r["architecture"])
         run.write_json("experiment.json", {
             "id": run.id, "profile": cfg.profile, "created_at": run.state["created_at"], "git_commit": git_commit(), "seed": cfg.seed,
@@ -276,7 +300,7 @@ def run_pipeline(profile: str, sync: str | None, publish_s3: bool, resume: bool,
     else:  # unapproved runs still publish their (labelled) experiment package for the lab views
         shutil.copy(gj, pkg / "craters.geojson")
 
-    if sync == "local":
+    if sync in ("local", "git"):
         entry = publish.publish_local(site, pkg, summary, model, cfg.publish.keep_versions, cfg.publish.max_upload_mb)
         info(log, f"published locally → {site} ({entry.get('model_version') or 'experiment only'})")
     if publish_s3:
@@ -287,6 +311,8 @@ def run_pipeline(profile: str, sync: str | None, publish_s3: bool, resume: bool,
         push(site, cfg)
     run.progress("completed", len(json.loads((run.dir / "training_history.json").read_text())["epochs"]), cfg.train.epochs, 1, 1, metrics, force=True)
     run.mark("publish", "done", finished=True)
+    if sync == "git":
+        live.push(f"{'model ' + model_version_of(site) if ok else 'experiment'}: {run.id} · val F1 {val['f1']:.3f}", force=True)
     info(log, f"done: {run.dir}")
     return 0
 
@@ -296,7 +322,8 @@ def main(argv=None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("pipeline")
     p.add_argument("--profile", default="development")
-    p.add_argument("--sync", choices=["local", "off"], default="off")
+    p.add_argument("--sync", choices=["local", "git", "off"], default="off",
+                   help="local: mirror to frontend/public/moonai · git: also commit + push every epoch (Colab live mode)")
     p.add_argument("--publish", action="store_true")
     p.add_argument("--resume", action="store_true")
     p.add_argument("--dry-run", action="store_true")

@@ -2,6 +2,8 @@
 
 ### 🌕 Live demo: **[jjullimayanne.github.io/moonIA](https://jjullimayanne.github.io/moonIA/)**
 
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jjullimayanne/moonIA/blob/main/notebooks/MoonAI_Colab_Training.ipynb) Train on a free GPU and watch it live in the Training Studio.
+
 **An interactive, scientifically grounded lunar exploration platform: a "Google Earth for the Moon" built on real NASA/USGS data, with a deep-learning crater detector trained locally and running in your browser.**
 
 Developed for the **Space Tech Bootcamp 2026 (FTL Brazil)**.
@@ -145,10 +147,12 @@ make pipeline PROFILE=production PUBLISH=true   # also uploads approved artifact
 make resume | status | dry-run | dashboard | rollback VERSION=v1 | cost-check
 ```
 
+**Training in the cloud for free:** [`notebooks/MoonAI_Colab_Training.ipynb`](notebooks/MoonAI_Colab_Training.ipynb) (step-by-step, in Portuguese) runs the same pipeline on a Colab GPU with fp16 mixed precision. Data and checkpoints go to Google Drive, so it resumes after disconnects. With `--sync git`, **every epoch is committed and pushed**, and the Training Studio shows the run live (~1–2 min GitHub Pages delay). It needs a fine-grained GitHub token (Contents: read/write on this repo only) stored in Colab Secrets.
+
 | Profile | Train / val / test tiles | U-Net width | Epochs | Purpose |
 |---|---|---|---|---|
 | `smoke` | 64 / 32 / 0 | 16 | 3 | checks the whole pipeline in ~30 s; **never published as a model** |
-| `development` | 2 000 / 400 / 400 | 32 | 10 | real reduced experiment, sized for a 16 GB Mac |
+| `development` | 6 000 / 400 / 400 | 32, rim-weighted loss (×5) | 12 | v2 experiment (v1 used 2 000 tiles, unweighted, 10 epochs) |
 | `production` | 30 000 / 5 000 / 5 000 | 112 | 4 | DeepMoon reproduction (needs ~12 GB free disk) |
 
 ### The data as it comes (DeepMoon, Zenodo 10.5281/zenodo.1133969)

@@ -1,6 +1,8 @@
 name: CI
 on:
-  push: { branches: [main] }
+  push:
+    branches: [main]
+    paths-ignore: ["frontend/public/moonai/**"]  # live training commits (Colab) only change published artifacts
   pull_request:
 
 jobs:

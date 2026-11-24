@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 
@@ -43,6 +44,14 @@ def _range(s, url: str, start: int, length: int, out: Path, desc: str) -> None:
         raise RuntimeError(f"{desc}: incomplete range ({out.stat().st_size} / {length} bytes)")
 
 
+def _sha256_file(p: Path) -> str:
+    h = hashlib.sha256()
+    with p.open("rb") as f:
+        while b := f.read(8 << 20):
+            h.update(b)
+    return h.hexdigest()
+
+
 def extract(split: str, n: int, out_dir: Path) -> Path:
     """Idempotent: returns the existing file if it was already extracted and verified."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -68,17 +77,23 @@ def extract(split: str, n: int, out_dir: Path) -> Path:
         cll = np.stack([h["cll_xy"][k][()] for k in ids]).astype("f8")
 
     s = session()
-    tmp = {}
+    # big temporary byte ranges go to fast local scratch (Colab: /content), results to out_dir
+    scratch = Path(os.environ.get("MOONAI_SCRATCH", out_dir))
+    scratch.mkdir(parents=True, exist_ok=True)
+    parts = {}
     for name, (offset, dtype, nbytes) in layout.items():
-        part = out_dir / f".{out.stem}.{name}.part"
+        part = scratch / f".{out.stem}.{name}.part"
         _range(s, rf.url, offset, nbytes, part, f"{split}/{name}")
-        tmp[name] = np.frombuffer(part.read_bytes(), dtype=dtype).reshape(n, TILE, TILE)
+        parts[name] = np.memmap(part, dtype=dtype, mode="r", shape=(n, TILE, TILE))
 
-    images = tmp["input_images"].copy()
-    masks = (tmp["target_masks"] > 0.5).astype(np.uint8)  # binary rings (stored as 0/1 float32)
+    chunk = 1000  # convert in blocks: RAM stays ~0.3 GB even for 30 000 tiles
     with h5py.File(out, "w") as o:
-        o.create_dataset("images", data=images, compression="lzf")
-        o.create_dataset("masks", data=masks, compression="lzf")
+        di = o.create_dataset("images", shape=(n, TILE, TILE), dtype="u1", compression="lzf", chunks=(1, TILE, TILE))
+        dm = o.create_dataset("masks", shape=(n, TILE, TILE), dtype="u1", compression="lzf", chunks=(1, TILE, TILE))
+        for a in range(0, n, chunk):
+            b = min(n, a + chunk)
+            di[a:b] = parts["input_images"][a:b]
+            dm[a:b] = (parts["target_masks"][a:b] > 0.5).astype(np.uint8)  # binary rings (stored as 0/1 float32)
         o.create_dataset("longlat_bounds", data=llbd)  # [lon_min, lon_max, lat_min, lat_max] (deg)
         o.create_dataset("distortion", data=dist)
         o.create_dataset("cll_xy", data=cll)
@@ -86,7 +101,8 @@ def extract(split: str, n: int, out_dir: Path) -> Path:
         o.attrs["split"] = split
         o.attrs["source"] = f"{rf.url} (first {n} tiles)"
     for name in layout:
-        (out_dir / f".{out.stem}.{name}.part").unlink(missing_ok=True)
+        del parts[name]
+        (scratch / f".{out.stem}.{name}.part").unlink(missing_ok=True)
 
     meta = {
         "complete": True,
@@ -96,7 +112,7 @@ def extract(split: str, n: int, out_dir: Path) -> Path:
         "source_md5": rf.md5,
         "source_url": rf.url,
         "extracted_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "sha256": hashlib.sha256(out.read_bytes()).hexdigest(),
+        "sha256": _sha256_file(out),
         "lon_range": [float(llbd[:, 0].min()), float(llbd[:, 1].max())],
         "lat_range": [float(llbd[:, 2].min()), float(llbd[:, 3].max())],
         "crs": "Moon sphere R=1737.4 km; tiles are orthographic crops of the 118 m/px LOLA-Kaguya DEM",

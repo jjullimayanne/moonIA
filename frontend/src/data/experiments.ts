@@ -62,6 +62,7 @@ export interface SampleIndex {
 export interface LiveProgress {
   experiment_id: string;
   status: "running" | "completed" | "failed" | "interrupted";
+  sync_interval_s?: number;
   epoch: number;
   total_epochs: number;
   step: number;
@@ -72,9 +73,11 @@ export interface LiveProgress {
 
 export const artifactUrl = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
 
-async function getJson<T>(path: string): Promise<T | null> {
+async function getJson<T>(path: string, bust = false): Promise<T | null> {
   try {
-    const r = await fetch(artifactUrl(path), { cache: "no-cache" });
+    // live files: a per-minute query string bypasses the CDN cache (GitHub Pages caches ~10 min)
+    const url = artifactUrl(path) + (bust ? `?t=${Math.floor(Date.now() / 60_000)}` : "");
+    const r = await fetch(url, { cache: "no-cache" });
     if (!r.ok || !r.headers.get("content-type")?.includes("json")) return null;
     return (await r.json()) as T;
   } catch {
@@ -82,18 +85,25 @@ async function getJson<T>(path: string): Promise<T | null> {
   }
 }
 
+/** The index refreshes every 2 min while any experiment is still running (live Colab training). */
 export const useExperimentIndex = () =>
-  useQuery({ queryKey: ["experiments"], staleTime: Infinity, retry: false, queryFn: () => getJson<ExperimentIndex>("moonai/experiments/index.json") });
+  useQuery({
+    queryKey: ["experiments"],
+    retry: false,
+    queryFn: () => getJson<ExperimentIndex>("moonai/experiments/index.json", true),
+    refetchInterval: (q) => (q.state.data?.experiments.some((e) => e.status === "running") ? 120_000 : false),
+  });
 
-export const useExperimentFile = <T,>(id: string | undefined, file: string) =>
+export const useExperimentFile = <T,>(id: string | undefined, file: string, live = false) =>
   useQuery({
     queryKey: ["experiment", id, file],
     enabled: !!id,
-    staleTime: Infinity,
+    staleTime: live ? 0 : Infinity,
     retry: false,
-    queryFn: () => getJson<T>(`moonai/experiments/${id}/${file}`),
+    refetchInterval: live ? 120_000 : false,
+    queryFn: () => getJson<T>(`moonai/experiments/${id}/${file}`, live),
   });
 
 /** Live progress: polled every 60 s only while the Training Studio is open. */
 export const useLiveProgress = () =>
-  useQuery({ queryKey: ["live"], retry: false, refetchInterval: 60_000, queryFn: () => getJson<LiveProgress>("moonai/live/progress.json") });
+  useQuery({ queryKey: ["live"], retry: false, refetchInterval: 60_000, queryFn: () => getJson<LiveProgress>("moonai/live/progress.json", true) });

@@ -39,6 +39,8 @@ class TrainCfg(BaseModel):
     lr: float = 1e-4
     weight_decay: float = 1e-6
     early_stopping_patience: int = 3
+    # weight of rim pixels in the BCE loss (rims are ~1.45 % of pixels); 1.0 = unweighted, as in DeepMoon
+    pos_weight: float = 1.0
     activation_epochs: list[int] = []
     eval_tiles_per_epoch: int = 64  # crater metrics per epoch on a fixed val subset (template matching is slow)
     progress_every_steps: int = 20
@@ -85,4 +87,11 @@ def load_config(profile: str) -> Config:
         cfg.train.batch_size = int(bs)
     if ep := os.environ.get("MOONAI_EPOCHS"):
         cfg.train.epochs = int(ep)
+    # storage overrides, e.g. Google Drive on Colab so data and checkpoints survive disconnects
+    if root := os.environ.get("MOONAI_DATA_ROOT"):
+        cfg.paths.raw, cfg.paths.processed = Path(root) / "raw", Path(root) / "processed"
+    if art := os.environ.get("MOONAI_ARTIFACTS"):
+        cfg.paths.artifacts, cfg.paths.mlruns = Path(art), Path(art) / "mlruns"
+    if mlr := os.environ.get("MOONAI_MLRUNS"):  # e.g. local disk on Colab (SQLite dislikes network filesystems)
+        cfg.paths.mlruns = Path(mlr)
     return cfg

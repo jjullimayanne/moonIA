@@ -82,7 +82,7 @@ def evaluate(model, loader, device, crater_gt, cfg: Config, n_crater_tiles: int)
     return out
 
 
-def train(cfg: Config, run: Run, train_h5: Path, val_h5: Path, crater_gt, mlflow=None) -> dict:
+def train(cfg: Config, run: Run, train_h5: Path, val_h5: Path, crater_gt, mlflow=None, on_epoch=None) -> dict:
     seed_everything(cfg.seed)
     hw = hardware.detect(str(cfg.paths.artifacts.parent))
     device = torch.device(hw.device)
@@ -96,7 +96,12 @@ def train(cfg: Config, run: Run, train_h5: Path, val_h5: Path, crater_gt, mlflow
     model = UNet(cfg.model.filters, cfg.model.dropout).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.train.lr, weight_decay=cfg.train.weight_decay)
     sched = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, factor=0.5, patience=1)
-    loss_fn = nn.BCEWithLogitsLoss()
+    # class-balanced training loss; validation loss stays unweighted so runs remain comparable
+    loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([cfg.train.pos_weight], device=device))
+    # NVIDIA GPUs: fp16 mixed precision (≈2× faster on a Colab T4). MPS/CPU stay in fp32.
+    amp = device.type == "cuda"
+    scaler = torch.amp.GradScaler("cuda", enabled=amp)
+    workers = 2 if device.type == "cuda" else 0
 
     history: list[dict] = []
     start_epoch, best, bad_epochs = 1, float("inf"), 0
@@ -123,6 +128,22 @@ def train(cfg: Config, run: Run, train_h5: Path, val_h5: Path, crater_gt, mlflow
     acts: dict[str, torch.Tensor] = {}
     hooks = [getattr(model, n).register_forward_hook(lambda m, i, o, n=n: acts.__setitem__(n, o.detach())) for n in ACTIVATION_LAYERS]
 
+    def write_samples_index() -> None:
+        """Which fixed tiles / epochs / activation maps exist — rewritten every epoch for live viewing."""
+        last = history[-1]["epoch"] if history else 0
+        run.write_json(
+            "samples/index.json",
+            {
+                "samples": [
+                    {"id": f"val_{i:03d}", "split": "val", "lon_range": val_ds.llbd[i, :2].tolist(), "lat_range": val_ds.llbd[i, 2:].tolist()}
+                    for i in fixed
+                ],
+                "epochs": [r["epoch"] for r in history],
+                "activation_layers": list(ACTIVATION_LAYERS),
+                "activation_epochs": sorted(int(p.name.split("_")[1]) for p in (run.dir / "activations").glob("epoch_*")) if last else [],
+            },
+        )
+
     steps_per_epoch = max(1, len(train_ds) // bs)
     for epoch in range(start_epoch, cfg.train.epochs + 1):
         t0 = time.time()
@@ -130,17 +151,19 @@ def train(cfg: Config, run: Run, train_h5: Path, val_h5: Path, crater_gt, mlflow
         while True:
             try:
                 model.train()
-                loader = DataLoader(train_ds, batch_size=bs, shuffle=True, drop_last=len(train_ds) > bs)
+                loader = DataLoader(train_ds, batch_size=bs, shuffle=True, drop_last=len(train_ds) > bs, num_workers=workers, pin_memory=amp)
                 steps_per_epoch = len(loader)
                 tl, n = 0.0, 0
                 for step, (x, y) in enumerate(loader, 1):
                     x, y = x.to(device), y.to(device)
                     opt.zero_grad(set_to_none=True)
-                    loss = loss_fn(model(x), y)
+                    with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=amp):
+                        loss = loss_fn(model(x), y)
                     if not torch.isfinite(loss):
                         raise FloatingPointError(f"non-finite loss at epoch {epoch} step {step}")
-                    loss.backward()
-                    opt.step()
+                    scaler.scale(loss).backward()
+                    scaler.step(opt)
+                    scaler.update()
                     tl += loss.item() * len(x)
                     n += len(x)
                     if step % cfg.train.progress_every_steps == 0 or step == steps_per_epoch:
@@ -191,22 +214,14 @@ def train(cfg: Config, run: Run, train_h5: Path, val_h5: Path, crater_gt, mlflow
         if improved:
             torch.save({"model": model.state_dict(), "epoch": epoch, "cfg": cfg.model.model_dump()}, ckpt.parent / "best.pt")
         run.write_json("training_history.json", {"epochs": history})
+        write_samples_index()
+        if on_epoch:
+            on_epoch(epoch, rec)
         if bad_epochs >= cfg.train.early_stopping_patience:
             info(log, f"early stopping at epoch {epoch}")
             break
 
     for h in hooks:
         h.remove()
-    run.write_json(
-        "samples/index.json",
-        {
-            "samples": [
-                {"id": f"val_{i:03d}", "split": "val", "lon_range": val_ds.llbd[i, :2].tolist(), "lat_range": val_ds.llbd[i, 2:].tolist()}
-                for i in fixed
-            ],
-            "epochs": [r["epoch"] for r in history],
-            "activation_layers": list(ACTIVATION_LAYERS),
-            "activation_epochs": sorted({e for e in cfg.train.activation_epochs if e <= history[-1]["epoch"]} | {history[-1]["epoch"]}),
-        },
-    )
+    write_samples_index()
     return {"history": history, "hardware": hw.as_dict(), "architecture": describe(model, cfg.model.filters), "batch_size": bs}

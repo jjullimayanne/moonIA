@@ -108,3 +108,29 @@ def test_global_dedupe_merges_overlapping_tile_detections():
     d = np.array([20.0, 21.0, 20.0])
     conf = np.array([0.6, 0.9, 0.7])
     assert list(dedupe_global(lon, lat, d, conf)) == [1, 2]  # keeps the more confident duplicate
+
+
+def test_live_sync_commits_and_pushes_each_epoch(tmp_path):
+    """LiveSync against a throw-away bare remote: mirror → commit → push, no real network."""
+    import subprocess
+
+    from moonai_ml.publishing.live import LiveSync
+    from moonai_ml.run import Run
+
+    g = lambda *a, cwd=tmp_path: subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True)
+    g("init", "-q", "--bare", "remote.git")
+    g("clone", "-q", str(tmp_path / "remote.git"), "repo")
+    repo = tmp_path / "repo"
+    g("config", "user.email", "t@t", cwd=repo)
+    g("config", "user.name", "t", cwd=repo)
+    site = repo / "frontend" / "public" / "moonai"
+    site.mkdir(parents=True)
+    run = Run(tmp_path / "runs" / "dev-1")
+    run.write_json("state.json", {"id": "dev-1", "created_at": "2026-01-01T00:00:00Z", "stages": {}})
+    run.write_json("training_history.json", {"epochs": [{"epoch": 1, "val_loss": 0.1, "f1": 0.2, "iou": 0.1, "precision": 0.3, "recall": 0.2}]})
+    live = LiveSync(run, site, repo, {"id": "dev-1", "profile": "development", "created_at": "2026-01-01T00:00:00Z"}, git=True)
+    live.on_epoch(1, {"val_loss": 0.1, "f1": 0.2})
+    log = subprocess.run(["git", "--git-dir", str(tmp_path / "remote.git"), "log", "--oneline"], check=True, capture_output=True, text=True).stdout
+    assert "epoch 1" in log
+    idx = json.loads((site / "experiments" / "index.json").read_text())
+    assert idx["experiments"][0]["status"] == "running" and idx["experiments"][0]["metrics"]["val_f1"] == 0.2

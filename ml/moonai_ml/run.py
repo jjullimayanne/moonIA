@@ -30,6 +30,8 @@ class Run:
         self.dir.mkdir(parents=True, exist_ok=True)
         self.sync_dirs = sync_dirs or []
         self._last_sync = 0.0
+        self.sync_interval_s = 30  # how often viewers can expect a fresh progress file
+        self.on_sync = None  # optional hook (git live sync) called after a mirrored update
 
     @classmethod
     def create(cls, cfg: Config, sync_dirs=None) -> Run:
@@ -83,6 +85,7 @@ class Run:
         data = {
             "experiment_id": self.id, "status": status, "epoch": epoch, "total_epochs": total_epochs,
             "step": step, "total_steps": total_steps, "metrics": metrics, "updated_at": now_iso(),
+            "sync_interval_s": self.sync_interval_s,
         }
         p = self.write_json("live/progress.json", data)
         if self.sync_dirs and (force or time.time() - self._last_sync > 30 or step == total_steps):
@@ -90,3 +93,5 @@ class Run:
                 (d / "live").mkdir(parents=True, exist_ok=True)
                 shutil.copy(p, d / "live" / "progress.json")
             self._last_sync = time.time()
+            if self.on_sync:
+                self.on_sync()
