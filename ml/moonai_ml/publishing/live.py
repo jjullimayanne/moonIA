@@ -80,6 +80,7 @@ class LiveSync:
                 err = r.stderr
                 self._git("pull", "-q", "--rebase", "-X", "theirs", check=False)  # someone else pushed meanwhile
                 time.sleep(2 * (attempt + 1))
+            self._last_push = time.time()  # back off: mid-epoch retries wait min_interval_s, never stalling training
             info(log, f"live sync: push failed 3×, will retry at the next epoch · {_redact(err)}")
         except subprocess.CalledProcessError as e:  # never break training because of sync
             info(log, f"live sync skipped: {e.stderr.strip()[:200] if e.stderr else e}")
