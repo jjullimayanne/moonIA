@@ -7,6 +7,7 @@ export type ViewMode = "3d" | "2d";
 /** Top-level modules. Explorer is the map; the others are full-screen lab views. */
 export const PAGES = [
   { id: "explorer", label: "Explorer" },
+  { id: "discoveries", label: "AI Discoveries" },
   { id: "training", label: "Training Studio" },
   { id: "playground", label: "AI Playground" },
   { id: "pipeline", label: "Pipeline" },

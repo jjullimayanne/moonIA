@@ -45,7 +45,7 @@ function StatusPill() {
     `Last update ${formatUpdate(when)}${m ? " (model)" : " (catalog data)"}. Models refresh at most once a day.`,
   ].join(" ");
   return (
-    <div className="flex items-center gap-2 rounded-full border border-edge px-3 py-1 text-[11px]" title={detail}>
+    <div className="flex items-center gap-2 rounded-full border border-edge px-3 py-1 text-[11px] whitespace-nowrap" title={detail}>
       <span className={`h-1.5 w-1.5 rounded-full ${apiOk ? "bg-ok shadow-[0_0_8px_#4ade80]" : "bg-regolith-600"}`} />
       <span className="text-regolith-400">{m ? `Model ${m.version}` : "Updated"}</span>
       <span className="num text-regolith-200">{formatUpdate(when)}</span>
@@ -61,7 +61,7 @@ function Nav() {
         <button
           key={p.id}
           onClick={() => setPage(p.id as Page)}
-          className={`rounded-md px-2.5 py-1 text-[12px] transition ${
+          className={`rounded-md px-2.5 py-1 text-[12px] whitespace-nowrap transition ${
             page === p.id ? "bg-white/8 text-regolith-50" : "text-regolith-400 hover:text-regolith-50"
           }`}
         >

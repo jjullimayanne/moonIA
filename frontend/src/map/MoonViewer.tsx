@@ -17,6 +17,7 @@ import {
   Math as CesiumMath,
   NearFarScalar,
   PolylineCollection,
+  PointPrimitiveCollection,
   Rectangle,
   SceneMode,
   ScreenSpaceEventHandler,
@@ -51,6 +52,9 @@ export function MoonViewer() {
   const viewerRef = useRef<Viewer | null>(null);
   const layersRef = useRef<Record<string, ImageryLayer>>({});
   const rimsRef = useRef<Partial<Record<CatalogId, PolylineCollection>>>({});
+  // far-zoom stand-ins: a dot per crater where its rim would be too small to see
+  const dotsRef = useRef<PointPrimitiveCollection | null>(null);
+  const detDotsRef = useRef<PointPrimitiveCollection | null>(null);
   const labelsRef = useRef<LabelCollection | null>(null);
   const selectionRef = useRef<PolylineCollection | null>(null);
   const detRef = useRef<PolylineCollection | null>(null);
@@ -119,7 +123,9 @@ export function MoonViewer() {
     }
 
     for (const id of CATALOG_IDS) rimsRef.current[id] = scene.primitives.add(new PolylineCollection());
+    dotsRef.current = scene.primitives.add(new PointPrimitiveCollection());
     detRef.current = scene.primitives.add(new PolylineCollection());
+    detDotsRef.current = scene.primitives.add(new PointPrimitiveCollection());
     selectionRef.current = scene.primitives.add(new PolylineCollection());
     labelsRef.current = scene.primitives.add(new LabelCollection());
 
@@ -181,6 +187,8 @@ export function MoonViewer() {
       labelsRef.current = null;
       selectionRef.current = null;
       detRef.current = null;
+      dotsRef.current = null;
+      detDotsRef.current = null;
       roiEntityRef.current = null;
     };
   }, []);
@@ -233,6 +241,7 @@ export function MoonViewer() {
   useEffect(() => {
     const [dmin, dmax] = diameterRange;
     const visible: Crater[] = [];
+    dotsRef.current?.removeAll();
     for (const id of CATALOG_IDS) {
       const coll = rimsRef.current[id];
       const data = catalogData[id];
@@ -252,7 +261,14 @@ export function MoonViewer() {
         const heights: number[] = [];
         for (let i = 0; i < ring.length; i += 2) heights.push(ring[i], ring[i + 1], h);
         // level of detail: a crater's rim appears once the camera is within ~120× its diameter
-        const ddc = new DistanceDisplayCondition(0, Math.max(800_000, c.diameter_km * 120_000));
+        const far = Math.max(800_000, c.diameter_km * 120_000);
+        const ddc = new DistanceDisplayCondition(0, far);
+        dotsRef.current?.add({
+          position: Cartesian3.fromDegrees(c.lon, c.lat, 2000, MOON),
+          pixelSize: 2.5,
+          color: rimColor,
+          distanceDisplayCondition: new DistanceDisplayCondition(far, 1e9),
+        });
         coll.add({
           positions: Cartesian3.fromDegreesArrayHeights(heights, MOON),
           width: 1,
@@ -272,6 +288,7 @@ export function MoonViewer() {
     const coll = detRef.current;
     if (!coll) return;
     coll.removeAll();
+    detDotsRef.current?.removeAll();
     const list = showDetections && detections.data ? detections.data.filter((d) => !discoveryOnly || !d.catalog_match) : [];
     detPickRef.current = list;
     const detColor = Color.fromCssColorString(DETECTION_STYLE.mapColor);
@@ -279,11 +296,20 @@ export function MoonViewer() {
       const ring = craterRim(d.lon, d.lat, d.diameter_km, 48);
       const pts: number[] = [];
       for (let i = 0; i < ring.length; i += 2) pts.push(ring[i], ring[i + 1], Math.min(4000, d.diameter_km * 6) + 500);
+      const far = Math.max(1_200_000, d.diameter_km * 150_000);
+      detDotsRef.current?.add({
+        position: Cartesian3.fromDegrees(d.lon, d.lat, 2500, MOON),
+        pixelSize: d.catalog_match ? 4 : 5,
+        color: detColor,
+        outlineColor: Color.BLACK.withAlpha(0.6),
+        outlineWidth: 1,
+        distanceDisplayCondition: new DistanceDisplayCondition(far, 1e9),
+      });
       coll.add({
         positions: Cartesian3.fromDegreesArrayHeights(pts, MOON),
         width: 2,
         material: Material.fromType("PolylineDash", { color: detColor, dashLength: 10 }), // per polyline, see rims
-        distanceDisplayCondition: new DistanceDisplayCondition(0, Math.max(1_200_000, d.diameter_km * 150_000)),
+        distanceDisplayCondition: new DistanceDisplayCondition(0, far),
       });
     }
     viewerRef.current?.scene.requestRender();

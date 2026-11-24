@@ -51,6 +51,15 @@ function CatalogRow({ id }: { id: CatalogId }) {
   );
 }
 
+function PovHint() {
+  const on = useMoon((s) => s.catalogs.povilaitis2018);
+  return <ZoomHint show={on} text="Small craters appear as dots from afar — zoom in to see their outlines." />;
+}
+
+function ZoomHint({ show, text }: { show: boolean; text: string }) {
+  return show ? <p className="-mt-1.5 pl-9.5 text-[10.5px] text-regolith-600">{text}</p> : null;
+}
+
 const LOG_MAX = Math.log10(2100);
 
 function DiameterFilter() {
@@ -130,6 +139,7 @@ export function LeftPanel() {
           <div className="space-y-3">
             <CatalogRow id="head2010" />
             <CatalogRow id="povilaitis2018" />
+            <PovHint />
             <div className="flex items-center gap-2.5">
               <Toggle on={showNames} onClick={() => set({ showNames: !showNames })} />
               <span className={`flex-1 text-[12.5px] ${showNames ? "text-regolith-50" : "text-regolith-400"}`}>Feature names</span>
