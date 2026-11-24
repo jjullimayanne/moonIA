@@ -97,3 +97,13 @@ def test_publish_versioning_and_rollback(tmp_path):
     assert rollback(site, "v1")["version"] == "v1"
     idx = json.loads((site / "experiments/index.json").read_text())
     assert [e["id"] for e in idx["experiments"]] == ["e2", "e1"]
+
+
+def test_global_dedupe_merges_overlapping_tile_detections():
+    from moonai_ml.evaluation.craters import dedupe_global
+
+    lon = np.array([10.0, 10.01, 20.0])
+    lat = np.array([5.0, 5.0, 5.0])
+    d = np.array([20.0, 21.0, 20.0])
+    conf = np.array([0.6, 0.9, 0.7])
+    assert list(dedupe_global(lon, lat, d, conf)) == [1, 2]  # keeps the more confident duplicate

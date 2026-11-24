@@ -34,6 +34,7 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import { RASTER_LAYERS, trekTemplate } from "../data/layers";
 import { CATALOG_STYLE, useCatalog, useNomenclature, type CatalogId, type Crater } from "../data/catalogs";
 import { craterRim, greatCircleKm, normalizeLon } from "../lib/lunar";
+import { DETECTION_STYLE, useDetections, type Detection } from "../data/detections";
 import { useMoon } from "../store";
 
 // The whole scene lives on the IAU Moon sphere (R = 1737.4 km), never WGS84.
@@ -52,11 +53,14 @@ export function MoonViewer() {
   const rimsRef = useRef<Partial<Record<CatalogId, PolylineCollection>>>({});
   const labelsRef = useRef<LabelCollection | null>(null);
   const selectionRef = useRef<PolylineCollection | null>(null);
+  const detRef = useRef<PolylineCollection | null>(null);
   const roiEntityRef = useRef<Entity | null>(null);
 
   const head = useCatalog("head2010");
   const pov = useCatalog("povilaitis2018");
   const names = useNomenclature();
+  const detections = useDetections();
+  const { showDetections, discoveryOnly } = useMoon();
   const catalogData: Record<CatalogId, Crater[] | undefined> = {
     head2010: head.data?.craters,
     povilaitis2018: pov.data?.craters,
@@ -115,6 +119,7 @@ export function MoonViewer() {
     }
 
     for (const id of CATALOG_IDS) rimsRef.current[id] = scene.primitives.add(new PolylineCollection());
+    detRef.current = scene.primitives.add(new PolylineCollection());
     selectionRef.current = scene.primitives.add(new PolylineCollection());
     labelsRef.current = scene.primitives.add(new LabelCollection());
 
@@ -162,7 +167,7 @@ export function MoonViewer() {
       if (st.drawingRoi) return;
       const p = toLonLat(e.position);
       if (!p) return;
-      st.set({ selectedPoint: p, selectedCrater: pickCrater(p), selectedFeature: pickFeature(p) });
+      st.set({ selectedPoint: p, selectedCrater: pickCrater(p), selectedFeature: pickFeature(p), selectedDetection: pickDetection(p) });
     }, ScreenSpaceEventType.LEFT_CLICK);
 
     viewerRef.current = viewer;
@@ -175,6 +180,7 @@ export function MoonViewer() {
       rimsRef.current = {};
       labelsRef.current = null;
       selectionRef.current = null;
+      detRef.current = null;
       roiEntityRef.current = null;
     };
   }, []);
@@ -190,6 +196,13 @@ export function MoonViewer() {
       if (Math.abs(c.lat - p.lat) > c.diameter_km / 50 + 0.1) continue; // cheap prefilter (~30 km/deg)
       const d = greatCircleKm(p.lon, p.lat, c.lon, c.lat);
       if (d <= c.diameter_km / 2 && (!best || c.diameter_km < best.diameter_km)) best = c;
+    }
+    return best;
+  };
+  const pickDetection = (p: { lon: number; lat: number }) => {
+    let best: Detection | null = null;
+    for (const d of detPickRef.current) {
+      if (greatCircleKm(p.lon, p.lat, d.lon, d.lat) <= d.diameter_km / 2 && (!best || d.diameter_km < best.diameter_km)) best = d;
     }
     return best;
   };
@@ -247,6 +260,29 @@ export function MoonViewer() {
     viewerRef.current?.scene.requestRender();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogs, diameterRange, head.data, pov.data]);
+
+  // ---- AI detections (dashed violet: distinguishable from catalogs without color) ----
+  const detPickRef = useRef<Detection[]>([]);
+  useEffect(() => {
+    const coll = detRef.current;
+    if (!coll) return;
+    coll.removeAll();
+    const list = showDetections && detections.data ? detections.data.filter((d) => !discoveryOnly || !d.catalog_match) : [];
+    detPickRef.current = list;
+    const material = Material.fromType("PolylineDash", { color: Color.fromCssColorString(DETECTION_STYLE.mapColor), dashLength: 10 });
+    for (const d of list) {
+      const ring = craterRim(d.lon, d.lat, d.diameter_km, 48);
+      const pts: number[] = [];
+      for (let i = 0; i < ring.length; i += 2) pts.push(ring[i], ring[i + 1], Math.min(4000, d.diameter_km * 6) + 500);
+      coll.add({
+        positions: Cartesian3.fromDegreesArrayHeights(pts, MOON),
+        width: 2,
+        material,
+        distanceDisplayCondition: new DistanceDisplayCondition(0, Math.max(1_200_000, d.diameter_km * 150_000)),
+      });
+    }
+    viewerRef.current?.scene.requestRender();
+  }, [detections.data, showDetections, discoveryOnly]);
 
   // ---- IAU names ----------------------------------------------------------
   useEffect(() => {

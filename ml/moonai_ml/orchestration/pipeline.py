@@ -21,7 +21,7 @@ import yaml
 
 from moonai_ml import hardware
 from moonai_ml.config import Config, load_config
-from moonai_ml.evaluation.craters import extract_craters, match, pixels_to_lonlat_km, recall_by_radius, summarize
+from moonai_ml.evaluation.craters import dedupe_global, extract_craters, match, pixels_to_lonlat_km, recall_by_radius, summarize
 from moonai_ml.export.onnx_export import export, quantize
 from moonai_ml.ingestion import subset, zenodo
 from moonai_ml.log import get_logger, info
@@ -145,6 +145,15 @@ def stage_predict(cfg: Config, run: Run, splits: list[str]) -> Path:
                     "properties": {"diameter_km": round(float(dkm), 3), "confidence": round(float(d[k, 3]), 3), "tile": f"{split}_{i:05d}",
                                    "split": split, "catalog_match": k in matched},
                 })
+    # overlapping tiles see the same crater several times → keep one (most confident)
+    if feats:
+        lon = np.array([f["geometry"]["coordinates"][0] for f in feats])
+        lat = np.array([f["geometry"]["coordinates"][1] for f in feats])
+        dkm = np.array([f["properties"]["diameter_km"] for f in feats])
+        conf = np.array([f["properties"]["confidence"] for f in feats])
+        n_raw = len(feats)
+        feats = [feats[i] for i in dedupe_global(lon, lat, dkm, conf, cfg.evaluation.longlat_thresh2, cfg.evaluation.rad_thresh)]
+        info(log, f"global dedupe: {n_raw} tile detections → {len(feats)} unique craters")
     gj = {"type": "FeatureCollection", "moonai:crs": "GCS_Moon_2000 · IAU:30100 · R = 1737.4 km (not WGS84)",
           "moonai:experiment": run.id, "features": feats}
     p = run.dir / "predictions" / "craters.geojson"

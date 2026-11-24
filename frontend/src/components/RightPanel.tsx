@@ -82,9 +82,9 @@ function RoiBlock() {
 }
 
 export function RightPanel() {
-  const { selectedPoint, selectedCrater, selectedFeature, roi, set } = useMoon();
+  const { selectedPoint, selectedCrater, selectedFeature, selectedDetection, roi, set } = useMoon();
   const open = !!(selectedPoint || roi);
-  const close = () => set({ selectedPoint: null, selectedCrater: null, selectedFeature: null });
+  const close = () => set({ selectedPoint: null, selectedCrater: null, selectedFeature: null, selectedDetection: null });
   return (
     <aside
       className={`glass scroll-thin absolute top-[68px] right-3 z-10 max-h-[calc(100%-140px)] w-72 overflow-y-auto rounded-xl transition-all duration-300 ${
@@ -120,6 +120,14 @@ export function RightPanel() {
             <Row k="Latitude" v={formatLat(selectedPoint.lat, 4)} />
             <Row k="Longitude" v={formatLon(selectedPoint.lon, 4)} />
           </div>
+        </Section>
+      )}
+
+      {selectedDetection && (
+        <Section title="AI detection" icon={CircleDot} info={GLOSSARY.detected}>
+          <Row k="Diameter" v={`${selectedDetection.diameter_km.toFixed(1)} km`} />
+          <Row k="Confidence (template corr.)" v={selectedDetection.confidence.toFixed(2)} />
+          <Row k="In catalog?" v={selectedDetection.catalog_match ? "yes — matched" : "no — candidate"} mono={false} />
         </Section>
       )}
 

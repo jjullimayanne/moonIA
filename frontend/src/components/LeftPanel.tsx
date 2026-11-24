@@ -5,6 +5,8 @@ import { CATALOG_STYLE, useCatalog, type CatalogId } from "../data/catalogs";
 import { GLOSSARY } from "../data/glossary";
 import { Section, Toggle } from "./Panel";
 import { InfoTip } from "./InfoTip";
+import { useManifest } from "../data/manifest";
+import { DETECTION_STYLE, useDetections } from "../data/detections";
 
 function LayerRow({ id, label, info, legend }: (typeof UI_LAYERS)[number]) {
   const { rasters, setRaster } = useMoon();
@@ -75,6 +77,39 @@ function DiameterFilter() {
   );
 }
 
+function DetectionRows() {
+  const { showDetections, discoveryOnly, set } = useMoon();
+  const manifest = useManifest();
+  const det = useDetections();
+  if (!manifest.data)
+    return (
+      <div className="flex items-center gap-2.5 opacity-50" title={GLOSSARY.detected}>
+        <Toggle on={false} onClick={() => {}} />
+        <span className="flex-1 text-[12.5px] text-regolith-400">AI detections</span>
+        <span className="text-[10px] text-regolith-600">no model yet</span>
+      </div>
+    );
+  const n = det.data?.length ?? 0;
+  const fresh = det.data?.filter((d) => !d.catalog_match).length ?? 0;
+  return (
+    <>
+      <div className="flex items-center gap-2.5">
+        <Toggle on={showDetections} onClick={() => set({ showDetections: !showDetections })} color={DETECTION_STYLE.mapColor} />
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full border-[1.5px] border-dashed" style={{ borderColor: DETECTION_STYLE.mapColor }} />
+        <span className={`flex-1 text-[12.5px] ${showDetections ? "text-regolith-50" : "text-regolith-400"}`}>AI · model {manifest.data.version}</span>
+        <span className="num text-[10px] text-regolith-600">{n.toLocaleString()}</span>
+      </div>
+      {showDetections && (
+        <div className="flex items-center gap-2.5 pl-9.5">
+          <input type="checkbox" checked={discoveryOnly} onChange={() => set({ discoveryOnly: !discoveryOnly })} className="accent-[#c58cff]" id="disc" />
+          <label htmlFor="disc" className="flex-1 text-[11.5px] text-regolith-200">Only uncatalogued ({fresh})</label>
+          <InfoTip text="Detections that match no catalogued crater. Some are real craters missing from the catalogs (they are incomplete below 5 km and in places above), others are false positives — candidates for expert verification, not confirmed discoveries." size={11} />
+        </div>
+      )}
+    </>
+  );
+}
+
 export function LeftPanel() {
   const { panels, togglePanel, showNames, set } = useMoon();
   return (
@@ -100,11 +135,7 @@ export function LeftPanel() {
               <span className={`flex-1 text-[12.5px] ${showNames ? "text-regolith-50" : "text-regolith-400"}`}>Feature names</span>
               <InfoTip text={GLOSSARY.labels} />
             </div>
-            <div className="flex items-center gap-2.5 opacity-50" title={GLOSSARY.detected}>
-              <Toggle on={false} onClick={() => {}} />
-              <span className="flex-1 text-[12.5px] text-regolith-400">AI detections</span>
-              <span className="text-[10px] text-regolith-600">soon</span>
-            </div>
+            <DetectionRows />
             <DiameterFilter />
           </div>
         </Section>

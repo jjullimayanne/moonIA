@@ -139,3 +139,38 @@ def pixels_to_lonlat_km(coords: np.ndarray, llbd: np.ndarray, distortion: float,
     lat = lat_c - deg_per_pix * (y - dim / 2.0) * (np.pi * latdiff / 180.0) / np.sin(np.pi * latdiff / 180.0)
     lon = lon_c + deg_per_pix * (x - dim / 2.0) / np.cos(np.pi * lat / 180.0)
     return np.column_stack([lon, lat, 2 * r * km_per_pix])
+
+
+def dedupe_global(lon: np.ndarray, lat: np.ndarray, d_km: np.ndarray, conf: np.ndarray,
+                  longlat_thresh2: float = 1.8, rad_thresh: float = 1.0) -> np.ndarray:
+    """Merge detections of the same crater found in overlapping tiles (DeepMoon get_unique_craters).
+
+    Uses the same criteria as tile-level matching, in km on the lunar sphere:
+    Δpos²/r_min² < longlat_thresh2 and |Δr|/r_min < rad_thresh. Keeps the most confident.
+    Returns indices of the unique detections.
+    """
+    order = np.argsort(-conf)
+    r = d_km / 2
+    keep: list[int] = []
+    cell: dict[tuple[int, int], list[int]] = {}
+    for i in order:
+        ci = (int(lat[i] // 1), int(lon[i] // 1))
+        dup = False
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                for j in cell.get((ci[0] + dy, ci[1] + dx), []):
+                    dlat = np.radians(lat[i] - lat[j])
+                    dlon = np.radians(lon[i] - lon[j]) * np.cos(np.radians(0.5 * (lat[i] + lat[j])))
+                    dist = MOON_RADIUS_KM * np.hypot(dlat, dlon)
+                    rmin = min(r[i], r[j])
+                    if (dist / rmin) ** 2 < longlat_thresh2 and abs(r[i] - r[j]) / rmin < rad_thresh:
+                        dup = True
+                        break
+                if dup:
+                    break
+            if dup:
+                break
+        if not dup:
+            keep.append(int(i))
+            cell.setdefault(ci, []).append(int(i))
+    return np.array(sorted(keep), dtype=int)

@@ -30,6 +30,9 @@ interface MoonState {
   rasters: Record<string, LayerState>;
   catalogs: Record<CatalogId, boolean>;
   showNames: boolean;
+  showDetections: boolean;
+  discoveryOnly: boolean;
+  selectedDetection: import("./data/detections").Detection | null;
   diameterRange: [number, number];
   cursor: { lon: number; lat: number } | null;
   selectedPoint: { lon: number; lat: number } | null;
@@ -62,6 +65,9 @@ export const useMoon = create<MoonState>((set) => ({
   },
   catalogs: { head2010: true, povilaitis2018: false },
   showNames: true,
+  showDetections: true,
+  discoveryOnly: false,
+  selectedDetection: null,
   diameterRange: [5, 2100],
   cursor: null,
   selectedPoint: null,
