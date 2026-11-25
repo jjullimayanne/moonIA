@@ -1,0 +1,19 @@
+{
+  "name": "U-Net (DeepMoon)",
+  "params": 10278017,
+  "levels": 3,
+  "filters": [
+    112,
+    224,
+    448,
+    448
+  ],
+  "input": [
+    1,
+    1,
+    256,
+    256
+  ],
+  "output": "logits [1,1,256,256]; sigmoid \u2192 rim probability",
+  "reference": "Silburt et al. 2019, Icarus 317:27-38"
+}

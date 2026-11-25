@@ -1,13 +1,13 @@
 {
   "schema_version": "1.0",
-  "version": "v1",
-  "experiment_id": "development-20261124-115919-0b5ebde",
-  "trained_at": "2026-11-24T14:59:19Z",
-  "published_at": "2026-11-24T15:38:51Z",
+  "version": "v2",
+  "experiment_id": "production-20261124-183448-560f4e7",
+  "trained_at": "2026-11-24T18:34:48Z",
+  "published_at": "2026-11-25T23:09:46Z",
   "dataset_version": "deepmoon-zenodo-1133969",
-  "model_url": "moonai/models/v1/model.onnx",
-  "predictions_url": "moonai/predictions/v1/craters.geojson",
-  "sha256": "611c2732a503ebfc4ce0a86acc73fcc270cd66de3ec68973d800b9924053a461",
+  "model_url": "moonai/models/v2/model.onnx",
+  "predictions_url": "moonai/predictions/v2/craters.geojson",
+  "sha256": "124153b4038aef95b7eebb436c7d34d3ec412c010e9ec0314ae26f6800376a18",
   "input": {
     "shape": [
       1,
@@ -26,15 +26,15 @@
     }
   },
   "metrics": {
-    "val_iou": 0.11345703417314269,
-    "val_precision": 0.6694915254237288,
-    "val_recall": 0.2441411279938192,
-    "val_f1": 0.35780335912436306,
-    "val_loc_err": 0.11712798239518672,
-    "val_diam_err": 0.06284700041393541,
-    "test_precision": 0.7046875,
-    "test_recall": 0.1560553633217993,
-    "test_f1": 0.25552407932011334,
-    "test_iou": 0.12847383032934898
+    "val_iou": 0.18458510834037148,
+    "val_precision": 0.6706851669320393,
+    "val_recall": 0.5518883620331088,
+    "val_f1": 0.6055150540210608,
+    "val_loc_err": 0.11146616664678805,
+    "val_diam_err": 0.04762508440104697,
+    "test_precision": 0.7139286015223436,
+    "test_recall": 0.49434050332568363,
+    "test_f1": 0.5841808299146184,
+    "test_iou": 0.1768320812812695
   }
 }

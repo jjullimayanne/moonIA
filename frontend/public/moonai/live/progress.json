@@ -1,13 +1,22 @@
 {
   "experiment_id": "production-20261124-183448-560f4e7",
-  "status": "running",
+  "status": "completed",
   "epoch": 4,
   "total_epochs": 4,
-  "step": 3750,
-  "total_steps": 3750,
+  "step": 1,
+  "total_steps": 1,
   "metrics": {
-    "train_loss": 0.07714312659054995
+    "val_iou": 0.18458510834037148,
+    "val_precision": 0.6706851669320393,
+    "val_recall": 0.5518883620331088,
+    "val_f1": 0.6055150540210608,
+    "val_loc_err": 0.11146616664678805,
+    "val_diam_err": 0.04762508440104697,
+    "test_precision": 0.7139286015223436,
+    "test_recall": 0.49434050332568363,
+    "test_f1": 0.5841808299146184,
+    "test_iou": 0.1768320812812695
   },
-  "updated_at": "2026-11-24T21:59:40Z",
+  "updated_at": "2026-11-25T23:09:46Z",
   "sync_interval_s": 600
 }
